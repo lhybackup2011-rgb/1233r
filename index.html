@@ -6,7 +6,6 @@
 <title>3X-UI 可视化控制面板</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  /* ---- Dark Theme Base ---- */
   :root {
     --bg-primary: #0b0e15;
     --bg-secondary: #111520;
@@ -42,11 +41,9 @@
   ::-webkit-scrollbar-track { background: var(--bg-secondary); }
   ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
   .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); }
   .card-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
   .card-body { padding:20px; }
-
   .btn {
     display:inline-flex; align-items:center; gap:6px; padding:8px 18px; border-radius:var(--radius-sm);
     font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.15s; border:none; line-height:1.4;
@@ -63,7 +60,6 @@
   .btn-sm { padding:5px 12px; font-size:0.78rem; }
   .btn-xs { padding:3px 8px; font-size:0.72rem; }
   .btn-icon { width:36px; height:36px; padding:0; justify-content:center; }
-
   .input {
     background:var(--bg-input); border:1px solid var(--border-light); border-radius:var(--radius-sm);
     padding:10px 14px; color:var(--text-primary); font-size:0.85rem; width:100%; outline:none; transition:border-color 0.15s;
@@ -73,15 +69,12 @@
   .select { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238892a8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:right 12px center; padding-right:36px; }
   .label { display:block; font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em; }
-
   .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:600; }
   .badge-success { background:rgba(34,197,94,0.15); color:var(--success); }
   .badge-warning { background:rgba(234,179,8,0.15); color:var(--warning); }
   .badge-danger { background:rgba(239,68,68,0.15); color:var(--danger); }
   .badge-info { background:rgba(59,130,246,0.15); color:var(--info); }
   .badge-accent { background:rgba(91,110,245,0.15); color:var(--accent-light); }
-
-  /* ---- Tabs ---- */
   .tabs-bar {
     display:flex; gap:2px; background:var(--bg-primary); border-radius:var(--radius-sm); padding:3px;
     border:1px solid var(--border); margin-bottom:20px; overflow-x:auto;
@@ -95,8 +88,6 @@
   .tab-panel { display:none; }
   .tab-panel.active { display:block; animation:fadeIn 0.2s ease; }
   @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
-
-  /* ---- Modal ---- */
   .modal-overlay {
     position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:1000;
     display:none; align-items:center; justify-content:center; padding:20px;
@@ -113,7 +104,6 @@
   .modal-close:hover { background:var(--danger); color:#fff; }
   .modal-body { padding:24px; overflow-y:auto; max-height:calc(90vh - 130px); }
   .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
-
   .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .form-group { display:flex; flex-direction:column; gap:4px; }
   .form-group.full { grid-column:1/-1; }
@@ -121,14 +111,10 @@
   .checkbox-label { display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--text-secondary); cursor:pointer; padding:4px 10px; border-radius:4px; background:var(--bg-input); border:1px solid var(--border-light); }
   .checkbox-label input[type="checkbox"] { accent-color:var(--accent); width:16px; height:16px; }
   .checkbox-label.checked { border-color:var(--accent); color:var(--text-primary); }
-
-  /* ---- Status Dot ---- */
   .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
   .status-dot.green { background:var(--success); box-shadow:0 0 6px rgba(34,197,94,0.5); }
   .status-dot.red { background:var(--danger); box-shadow:0 0 6px rgba(239,68,68,0.5); }
   .status-dot.yellow { background:var(--warning); box-shadow:0 0 6px rgba(234,179,8,0.5); }
-
-  /* ---- Toast ---- */
   .toast-container { position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
   .toast { padding:12px 20px; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:600; box-shadow:var(--shadow);
     transform:translateX(120%); transition:transform 0.3s ease; max-width:360px; }
@@ -136,14 +122,17 @@
   .toast.success { background:rgba(34,197,94,0.9); color:#fff; }
   .toast.error { background:rgba(239,68,68,0.9); color:#fff; }
   .toast.info { background:rgba(59,130,246,0.9); color:#fff; }
-
-  /* ---- Scrollable Code ---- */
   .code-block { background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; font-family:'JetBrains Mono','Fira Code',monospace; font-size:0.78rem; color:var(--text-secondary); overflow-x:auto; white-space:pre-wrap; word-break:break-all; max-height:200px; overflow-y:auto; }
-
-  /* ---- Copy Button Animation ---- */
-  .copy-feedback::after { content:'Copied!'; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; padding:4px 10px; border-radius:4px; font-size:0.7rem; white-space:nowrap; }
-
-  /* ---- Responsive ---- */
+  .config-table { width:100%; border-collapse:collapse; }
+  .config-table tr { border-bottom:1px solid var(--border); }
+  .config-table tr:last-child { border-bottom:none; }
+  .config-table td { padding:10px 8px; vertical-align:middle; }
+  .config-table td:first-child { color:var(--text-secondary); font-size:0.85em; width:180px; white-space:nowrap; }
+  .config-table td:last-child { font-family:'Courier New',monospace; font-size:0.85em; word-break:break-all; }
+  .ip-table { width:100%; border-collapse:collapse; }
+  .ip-table th { text-align:left; padding:8px 12px; background:var(--bg-primary); color:var(--text-secondary); font-size:0.82em; font-weight:600; border-radius:6px; }
+  .ip-table td { padding:8px 12px; border-bottom:1px solid var(--border); font-family:'Courier New',monospace; font-size:0.85em; }
+  .ip-table tr:hover td { background:var(--bg-hover); }
   @media(max-width:640px) {
     .form-grid { grid-template-columns:1fr; }
     .modal { max-width:100%; margin:10px; border-radius:var(--radius); }
@@ -154,17 +143,10 @@
 </head>
 <body>
 
-<!-- ============================================================ -->
-<!-- TOAST CONTAINER -->
-<!-- ============================================================ -->
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ============================================================ -->
-<!-- APP SHELL -->
-<!-- ============================================================ -->
 <div class="min-h-screen flex flex-col">
 
-  <!-- ===================== HEADER ===================== -->
   <header class="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -184,10 +166,8 @@
     </div>
   </header>
 
-  <!-- ===================== MAIN ===================== -->
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
 
-    <!-- ---- Stats Grid ---- -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6" id="statsGrid">
       <div class="card p-4 text-center">
         <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Xray 进程</div>
@@ -215,13 +195,12 @@
       </div>
     </div>
 
-    <!-- ---- Subscription Section ---- -->
     <div class="card mb-6">
       <div class="card-header">
         <div class="flex items-center gap-2">
           <span class="text-lg">🔗</span>
           <span class="font-semibold">订阅链接</span>
-          <span class="text-xs text-[var(--text-muted)] bg-[var(--bg-hover)] px-2 py-0.5 rounded">GeoIP 自适应</span>
+          <span class="text-xs text-[var(--text-muted)] bg-[var(--bg-hover)] px-2 py-0.5 rounded">GeoIP 自适应 · TCP 动态探测</span>
         </div>
         <button class="btn btn-sm btn-ghost" onclick="copySubUrl()">📋 复制</button>
       </div>
@@ -230,20 +209,19 @@
           <code class="flex-1 text-sm text-[var(--accent-light)] bg-[var(--bg-primary)] px-4 py-2.5 rounded border border-[var(--border)] min-w-[200px] break-all" id="subUrlDisplay">加载中...</code>
         </div>
         <div class="flex gap-3 mt-4 flex-wrap">
-          <button class="btn btn-sm btn-primary" onclick="showQRCode()">📱 显示二维码</button>
-          <button class="btn btn-sm btn-ghost" onclick="refreshSubscription()">⟳ 刷新订阅</button>
-          <span class="text-xs text-[var(--text-muted)] self-center ml-auto">访问订阅自动根据 IP 分配最优节点</span>
+          <button class="btn btn-sm btn-primary" onclick="showQRCode()">📱 二维码</button>
+          <button class="btn btn-sm btn-ghost" onclick="refreshSubscription()">⟳ 刷新</button>
+          <span class="text-xs text-[var(--text-muted)] self-center ml-auto">每秒随机采样 20 CF IP → TCP 测速 → Top 3 最优</span>
         </div>
         <div id="qrSection" class="hidden mt-4">
           <div class="flex justify-center p-4 bg-white rounded-lg">
             <div id="qrcode"></div>
           </div>
-          <p class="text-center text-xs text-[var(--text-muted)] mt-2">使用客户端扫码导入</p>
+          <p class="text-center text-xs text-[var(--text-muted)] mt-2">扫码导入客户端</p>
         </div>
       </div>
     </div>
 
-    <!-- ---- Inbound Config Card ---- -->
     <div class="card mb-6">
       <div class="card-header">
         <div class="flex items-center gap-2">
@@ -258,48 +236,23 @@
       </div>
       <div class="card-body">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="configSummary">
-          <div>
-            <div class="label">协议</div>
-            <div class="font-semibold" id="cfgProtocol">VLESS</div>
-          </div>
-          <div>
-            <div class="label">传输</div>
-            <div class="font-semibold" id="cfgNetwork">WS</div>
-          </div>
-          <div>
-            <div class="label">安全</div>
-            <div class="font-semibold" id="cfgSecurity">none</div>
-          </div>
-          <div>
-            <div class="label">路径</div>
-            <div class="text-sm font-mono text-[var(--accent-light)] truncate" id="cfgPath">/vless-argo</div>
-          </div>
-          <div>
-            <div class="label">UUID</div>
-            <div class="text-sm font-mono text-[var(--text-secondary)] truncate" id="cfgUUID">-</div>
-          </div>
-          <div>
-            <div class="label">嗅探</div>
-            <div class="font-semibold" id="cfgSniffing">启用</div>
-          </div>
-          <div>
-            <div class="label">TLS SNI</div>
-            <div class="text-sm font-mono text-[var(--text-secondary)] truncate" id="cfgSNI">-</div>
-          </div>
-          <div>
-            <div class="label">Hot Reload</div>
-            <div class="text-xs text-[var(--text-muted)]" id="cfgLog">-</div>
-          </div>
+          <div><div class="label">协议</div><div class="font-semibold" id="cfgProtocol">VLESS</div></div>
+          <div><div class="label">传输</div><div class="font-semibold" id="cfgNetwork">WS</div></div>
+          <div><div class="label">安全</div><div class="font-semibold" id="cfgSecurity">none</div></div>
+          <div><div class="label">路径</div><div class="text-sm font-mono text-[var(--accent-light)] truncate" id="cfgPath">/vless-argo</div></div>
+          <div><div class="label">UUID</div><div class="text-sm font-mono text-[var(--text-secondary)] truncate" id="cfgUUID">-</div></div>
+          <div><div class="label">嗅探</div><div class="font-semibold" id="cfgSniffing">启用</div></div>
+          <div><div class="label">TLS SNI</div><div class="text-sm font-mono text-[var(--text-secondary)] truncate" id="cfgSNI">-</div></div>
+          <div><div class="label">Hot Reload</div><div class="text-xs text-[var(--text-muted)]" id="cfgLog">-</div></div>
         </div>
       </div>
     </div>
 
-    <!-- ---- Nodes & System Tabs ---- -->
     <div class="card">
       <div class="card-header">
         <div class="flex items-center gap-2">
           <span class="text-lg">📡</span>
-          <span class="font-semibold">节点列表 & 系统状态</span>
+          <span class="font-semibold">详情</span>
         </div>
         <div class="flex gap-2">
           <button class="btn btn-sm btn-ghost" onclick="restartArgo()">⟳ 重启隧道</button>
@@ -309,10 +262,11 @@
         <div class="tabs-bar">
           <button class="tab-btn active" data-tab="tabNodes">📡 节点列表</button>
           <button class="tab-btn" data-tab="tabSystem">⚙️ 系统状态</button>
+          <button class="tab-btn" data-tab="tabCFIP">🌐 优选 IP</button>
+          <button class="tab-btn" data-tab="tabConfig">⚙️ 配置信息</button>
           <button class="tab-btn" data-tab="tabActions">⚡ 操作日志</button>
         </div>
 
-        <!-- Tab: Nodes -->
         <div class="tab-panel active" id="tabNodes">
           <div id="nodesLoading" class="text-center py-8 text-[var(--text-muted)]">
             <div class="inline-block w-8 h-8 border-2 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin mb-3"></div>
@@ -321,31 +275,28 @@
           <div id="nodesList" class="space-y-2"></div>
         </div>
 
-        <!-- Tab: System Status -->
         <div class="tab-panel" id="tabSystem">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 class="text-sm font-semibold text-[var(--text-secondary)] mb-3">进程状态</h4>
               <div class="space-y-3">
                 <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-                  <span>Xray 核心</span>
-                  <span id="sysXrayStatus"><span class="badge badge-warning">检测中</span></span>
+                  <span>Xray 核心</span><span id="sysXrayStatus"><span class="badge badge-warning">检测中</span></span>
                 </div>
                 <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-                  <span>Argo 隧道</span>
-                  <span id="sysArgoStatus"><span class="badge badge-warning">检测中</span></span>
+                  <span>Argo 隧道</span><span id="sysArgoStatus"><span class="badge badge-warning">检测中</span></span>
                 </div>
                 <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-                  <span>平台</span>
-                  <span class="text-sm text-[var(--text-secondary)]" id="sysPlatform">-</span>
+                  <span>平台</span><span class="text-sm text-[var(--text-secondary)]" id="sysPlatform">-</span>
                 </div>
                 <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-                  <span>架构</span>
-                  <span class="text-sm text-[var(--text-secondary)]" id="sysArch">-</span>
+                  <span>架构</span><span class="text-sm text-[var(--text-secondary)]" id="sysArch">-</span>
                 </div>
                 <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-                  <span>主机名</span>
-                  <span class="text-sm text-[var(--text-secondary)]" id="sysHostname">-</span>
+                  <span>主机名</span><span class="text-sm text-[var(--text-secondary)]" id="sysHostname">-</span>
+                </div>
+                <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
+                  <span>服务器 IP</span><span class="text-sm text-[var(--accent-light)]" id="sysServerIP">加载中...</span>
                 </div>
               </div>
             </div>
@@ -354,8 +305,7 @@
               <div class="space-y-3">
                 <div class="bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
                   <div class="flex justify-between text-sm mb-2">
-                    <span>内存</span>
-                    <span class="font-mono" id="sysMemDetail">- / - MB</span>
+                    <span>内存</span><span class="font-mono" id="sysMemDetail">- / - MB</span>
                   </div>
                   <div class="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
                     <div class="h-full bg-[var(--info)] rounded-full transition-all duration-500" id="sysMemBar" style="width:0%"></div>
@@ -363,15 +313,13 @@
                 </div>
                 <div class="bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
                   <div class="flex justify-between text-sm mb-2">
-                    <span>CPU 核心</span>
-                    <span class="font-mono" id="sysCpuDetail">-</span>
+                    <span>CPU 核心</span><span class="font-mono" id="sysCpuDetail">-</span>
                   </div>
                   <div class="text-xs text-[var(--text-muted)]" id="sysCpuModel">-</div>
                 </div>
                 <div class="bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
                   <div class="flex justify-between text-sm mb-2">
-                    <span>运行时间</span>
-                    <span class="font-mono" id="sysUptime">-</span>
+                    <span>运行时间</span><span class="font-mono" id="sysUptime">-</span>
                   </div>
                 </div>
                 <div class="bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
@@ -385,25 +333,38 @@
           </div>
         </div>
 
-        <!-- Tab: Action Log -->
-        <div class="tab-panel" id="tabActions">
-          <div class="code-block text-xs" id="actionLog">
-            等待操作日志...
+        <div class="tab-panel" id="tabCFIP">
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-sm font-semibold text-[var(--text-secondary)]">优选 IP 列表</h4>
+            <button class="btn btn-sm btn-ghost" onclick="refreshCFIP()">⟳ 刷新</button>
           </div>
+          <table class="ip-table" id="cfipTable">
+            <thead>
+              <tr><th>#</th><th>IP 地址</th><th>端口</th><th>来源</th></tr>
+            </thead>
+            <tbody id="cfipBody"></tbody>
+          </table>
+          <div class="mt-4 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border)] text-xs text-[var(--text-muted)]">
+            💡 动态订阅会自动从 15 条 CF CIDR 段随机采样 20 个 IP → TCP 并发测速(1.5s超时) → 返回最快 Top 3
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tabConfig">
+          <table class="config-table" id="fullConfigTable"></table>
+        </div>
+
+        <div class="tab-panel" id="tabActions">
+          <div class="code-block text-xs" id="actionLog">等待操作日志...</div>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- ===================== FOOTER ===================== -->
   <footer class="border-t border-[var(--border)] bg-[var(--bg-secondary)] py-4 text-center text-xs text-[var(--text-muted)]">
     3X-UI Dashboard · Xray + Argo Tunnel · Dynamic Subscription System
   </footer>
 </div>
 
-<!-- ============================================================ -->
-<!-- CONFIG MODAL -->
-<!-- ============================================================ -->
 <div class="modal-overlay" id="configModal">
   <div class="modal">
     <div class="modal-header">
@@ -411,16 +372,12 @@
       <button class="modal-close" onclick="closeConfigModal()">✕</button>
     </div>
     <div class="modal-body">
-
-      <!-- Modal Tabs -->
       <div class="tabs-bar">
         <button class="tab-btn active" data-mtab="mtabBasic">📋 基础</button>
         <button class="tab-btn" data-mtab="mtabTransport">🌐 传输</button>
         <button class="tab-btn" data-mtab="mtabSecurity">🔒 安全</button>
         <button class="tab-btn" data-mtab="mtabSniffing">👃 嗅探</button>
       </div>
-
-      <!-- Tab: Basic -->
       <div class="tab-panel active" id="mtabBasic">
         <div class="form-grid">
           <div class="form-group">
@@ -445,20 +402,18 @@
           </div>
         </div>
       </div>
-
-      <!-- Tab: Transport -->
       <div class="tab-panel" id="mtabTransport">
         <div class="form-grid">
           <div class="form-group">
-            <label class="label">网络类型 Network</label>
+            <label class="label">网络 Network</label>
             <select class="input select" id="modalNetwork">
-              <option value="ws">WebSocket (WS)</option>
+              <option value="ws">WebSocket</option>
               <option value="tcp">TCP</option>
               <option value="grpc">gRPC</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="label">伪装路径 Path</label>
+            <label class="label">路径 Path</label>
             <input class="input" id="modalPath" placeholder="/vless-argo">
           </div>
           <div class="form-group full" id="grpcSettingsGroup" style="display:none">
@@ -466,13 +421,11 @@
             <input class="input" id="modalGRPCServiceName" placeholder="service name">
           </div>
           <div class="form-group full">
-            <label class="label">Host (伪装域名)</label>
+            <label class="label">Host</label>
             <input class="input" id="modalHost" placeholder="Host header">
           </div>
         </div>
       </div>
-
-      <!-- Tab: Security -->
       <div class="tab-panel" id="mtabSecurity">
         <div class="form-grid">
           <div class="form-group">
@@ -483,7 +436,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="label">SNI (Server Name)</label>
+            <label class="label">SNI</label>
             <input class="input" id="modalSNI" placeholder="sni.example.com">
           </div>
           <div class="form-group">
@@ -499,8 +452,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Tab: Sniffing -->
       <div class="tab-panel" id="mtabSniffing">
         <div class="space-y-4">
           <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
@@ -511,24 +462,16 @@
             </label>
           </div>
           <div>
-            <label class="label mb-2">DestOverride (目的地覆盖)</label>
+            <label class="label mb-2">DestOverride</label>
             <div class="checkbox-group">
-              <label class="checkbox-label" id="chkHttp">
-                <input type="checkbox" value="http" checked> HTTP
-              </label>
-              <label class="checkbox-label" id="chkTls">
-                <input type="checkbox" value="tls" checked> TLS
-              </label>
-              <label class="checkbox-label" id="chkQuic">
-                <input type="checkbox" value="quic" checked> QUIC
-              </label>
-              <label class="checkbox-label" id="chkFake">
-                <input type="checkbox" value="fakedns"> FakeDNS
-              </label>
+              <label class="checkbox-label"><input type="checkbox" value="http" checked> HTTP</label>
+              <label class="checkbox-label"><input type="checkbox" value="tls" checked> TLS</label>
+              <label class="checkbox-label"><input type="checkbox" value="quic" checked> QUIC</label>
+              <label class="checkbox-label"><input type="checkbox" value="fakedns"> FakeDNS</label>
             </div>
           </div>
           <div class="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)]">
-            <span class="text-sm font-medium">仅元数据 (metadataOnly)</span>
+            <span class="text-sm font-medium">metadataOnly</span>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="modalMetadataOnly" class="sr-only peer">
               <div class="w-11 h-6 bg-[var(--bg-hover)] rounded-full peer peer-checked:bg-[var(--accent)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -536,7 +479,6 @@
           </div>
         </div>
       </div>
-
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeConfigModal()">取消</button>
@@ -545,33 +487,18 @@
   </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- JAVASCRIPT -->
-<!-- ============================================================ -->
 <script>
-// ================================================================
-// UTILITIES
-// ================================================================
 function showToast(msg, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
+  toast.className = 'toast ' + type;
   toast.textContent = msg;
   container.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('show'));
-  setTimeout(() => {
+  requestAnimationFrame(function() { toast.classList.add('show'); });
+  setTimeout(function() {
     toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(function() { toast.remove(); }, 300);
   }, 3000);
-}
-
-function formatBytes(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let i = 0;
-  let val = bytes;
-  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
-  return val.toFixed(1) + ' ' + units[i];
 }
 
 function maskUUID(uuid) {
@@ -579,69 +506,52 @@ function maskUUID(uuid) {
   return uuid.substring(0, 8) + '••••' + uuid.substring(uuid.length - 4);
 }
 
-function getProtocolEmoji(proto) {
-  const map = { vless: '🔵', vmess: '🟢', trojan: '🔴', hysteria2: '🟡', tuic: '🔷' };
-  return map[proto] || '⚪';
-}
-
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#039;');
 }
 
-// ================================================================
-// TAB SWITCHING (Main tabs)
-// ================================================================
-document.querySelectorAll('[data-tab]').forEach(btn => {
+// ---- Tab switching ----
+document.querySelectorAll('[data-tab]').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('[data-tab]').forEach(function(b) { b.classList.remove('active'); });
     this.classList.add('active');
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     document.getElementById(this.dataset.tab).classList.add('active');
   });
 });
-
-// ================================================================
-// MODAL TAB SWITCHING
-// ================================================================
-document.querySelectorAll('[data-mtab]').forEach(btn => {
+document.querySelectorAll('[data-mtab]').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    document.querySelectorAll('[data-mtab]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('[data-mtab]').forEach(function(b) { b.classList.remove('active'); });
     this.classList.add('active');
-    document.querySelectorAll('#configModal .tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('#configModal .tab-panel').forEach(function(p) { p.classList.remove('active'); });
     document.getElementById(this.dataset.mtab).classList.add('active');
   });
 });
-
-// Show/hide gRPC settings based on network
 document.getElementById('modalNetwork').addEventListener('change', function() {
   document.getElementById('grpcSettingsGroup').style.display = this.value === 'grpc' ? 'block' : 'none';
 });
 
-// ================================================================
-// COPY SUB URL
-// ================================================================
+// ---- Copy sub URL ----
 function copySubUrl() {
-  const text = document.getElementById('subUrlDisplay').textContent;
+  var text = document.getElementById('subUrlDisplay').textContent;
   if (text && text !== '加载中...') {
-    navigator.clipboard.writeText(text).then(() => showToast('✅ 订阅链接已复制', 'success'));
+    navigator.clipboard.writeText(text).then(function() { showToast('✅ 订阅链接已复制', 'success'); });
   } else {
     showToast('❌ 订阅链接尚未生成', 'error');
   }
 }
 
-// ================================================================
-// QR CODE
-// ================================================================
+// ---- QR Code ----
 function showQRCode() {
-  const section = document.getElementById('qrSection');
-  const subUrl = document.getElementById('subUrlDisplay').textContent;
+  var section = document.getElementById('qrSection');
+  var subUrl = document.getElementById('subUrlDisplay').textContent;
   if (!subUrl || subUrl === '加载中...') { showToast('❌ 订阅链接尚未生成', 'error'); return; }
   section.classList.remove('hidden');
-  const div = document.getElementById('qrcode');
+  var div = document.getElementById('qrcode');
   div.innerHTML = '';
-  const size = Math.min(256, window.innerWidth - 100);
-  const img = document.createElement('img');
+  var size = Math.min(256, window.innerWidth - 100);
+  var img = document.createElement('img');
   img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(subUrl) + '&bgcolor=ffffff&color=000000&margin=10';
   img.width = size;
   img.height = size;
@@ -650,390 +560,300 @@ function showQRCode() {
   div.appendChild(img);
 }
 
-function hideQRCode() {
-  document.getElementById('qrSection').classList.add('hidden');
-}
-
-// Close QR when clicking outside
-document.getElementById('qrSection').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.add('hidden');
-});
-
-// ================================================================
-// MODAL
-// ================================================================
+// ---- Config Modal ----
 function openConfigModal() {
-  // Load current config into modal
   fetch('/api/inbound-config')
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       document.getElementById('modalProtocol').value = data.protocol || 'vless';
-      document.getElementById('modalUUID').value = data.settings?.clients?.[0]?.id || '';
-      document.getElementById('modalFlow').value = data.settings?.clients?.[0]?.flow || '';
-      document.getElementById('modalNetwork').value = data.streamSettings?.network || 'ws';
-      document.getElementById('modalPath').value = data.streamSettings?.wsSettings?.path || '/vless-argo';
-      document.getElementById('modalHost').value = data.streamSettings?.wsSettings?.headers?.Host || '';
-      document.getElementById('modalGRPCServiceName').value = data.streamSettings?.grpcSettings?.serviceName || '';
-      document.getElementById('modalSecurity').value = data.streamSettings?.security || 'none';
-      document.getElementById('modalSNI').value = data.streamSettings?.tlsSettings?.serverName || '';
-      document.getElementById('modalALPN').value = (data.streamSettings?.tlsSettings?.alpn || []).join(',');
-      document.getElementById('modalMinVersion').value = data.streamSettings?.tlsSettings?.minVersion || '1.2';
-
-      // Sniffing
-      document.getElementById('modalSniffingEnabled').checked = data.sniffing?.enabled !== false;
-      const doList = data.sniffing?.destOverride || ['http','tls','quic'];
-      document.querySelectorAll('#configModal .checkbox-group input[type="checkbox"]').forEach(cb => {
-        cb.checked = doList.includes(cb.value);
-      });
-      document.getElementById('modalMetadataOnly').checked = data.sniffing?.metadataOnly === true;
-
-      document.getElementById('grpcSettingsGroup').style.display = data.streamSettings?.network === 'grpc' ? 'block' : 'none';
+      document.getElementById('modalUUID').value = data.settings && data.settings.clients && data.settings.clients[0] ? data.settings.clients[0].id : '';
+      document.getElementById('modalFlow').value = data.settings && data.settings.clients && data.settings.clients[0] ? (data.settings.clients[0].flow || '') : '';
+      document.getElementById('modalNetwork').value = (data.streamSettings && data.streamSettings.network) || 'ws';
+      document.getElementById('modalPath').value = (data.streamSettings && data.streamSettings.wsSettings && data.streamSettings.wsSettings.path) || '/vless-argo';
+      document.getElementById('modalHost').value = (data.streamSettings && data.streamSettings.wsSettings && data.streamSettings.wsSettings.headers && data.streamSettings.wsSettings.headers.Host) || '';
+      document.getElementById('modalGRPCServiceName').value = (data.streamSettings && data.streamSettings.grpcSettings && data.streamSettings.grpcSettings.serviceName) || '';
+      document.getElementById('modalSecurity').value = (data.streamSettings && data.streamSettings.security) || 'none';
+      document.getElementById('modalSNI').value = (data.streamSettings && data.streamSettings.tlsSettings && data.streamSettings.tlsSettings.serverName) || '';
+      document.getElementById('modalALPN').value = (data.streamSettings && data.streamSettings.tlsSettings && data.streamSettings.tlsSettings.alpn || []).join(',');
+      document.getElementById('modalMinVersion').value = (data.streamSettings && data.streamSettings.tlsSettings && data.streamSettings.tlsSettings.minVersion) || '1.2';
+      document.getElementById('modalSniffingEnabled').checked = data.sniffing && data.sniffing.enabled !== false;
+      var doList = (data.sniffing && data.sniffing.destOverride) || ['http','tls','quic'];
+      document.querySelectorAll('#configModal .checkbox-group input[type="checkbox"]').forEach(function(cb) { cb.checked = doList.indexOf(cb.value) >= 0; });
+      document.getElementById('modalMetadataOnly').checked = data.sniffing && data.sniffing.metadataOnly === true;
+      document.getElementById('grpcSettingsGroup').style.display = data.streamSettings && data.streamSettings.network === 'grpc' ? 'block' : 'none';
       document.getElementById('configModal').classList.add('open');
     })
-    .catch(err => {
-      showToast('❌ 无法加载配置: ' + err.message, 'error');
-    });
+    .catch(function(err) { showToast('❌ 无法加载配置: ' + err.message, 'error'); });
 }
 
-function closeConfigModal() {
-  document.getElementById('configModal').classList.remove('open');
-}
+function closeConfigModal() { document.getElementById('configModal').classList.remove('open'); }
+document.getElementById('configModal').addEventListener('click', function(e) { if (e.target === this) closeConfigModal(); });
 
-// Close modal on overlay click
-document.getElementById('configModal').addEventListener('click', function(e) {
-  if (e.target === this) closeConfigModal();
-});
-
-// ================================================================
-// SAVE CONFIG & HOT RESTART (Module 2)
-// ================================================================
 async function saveConfig() {
-  const protocol = document.getElementById('modalProtocol').value;
-  const uuid = document.getElementById('modalUUID').value;
-  const flow = document.getElementById('modalFlow').value;
-  const network = document.getElementById('modalNetwork').value;
-  const path = document.getElementById('modalPath').value;
-  const host = document.getElementById('modalHost').value;
-  const grpcService = document.getElementById('modalGRPCServiceName').value;
-  const security = document.getElementById('modalSecurity').value;
-  const sni = document.getElementById('modalSNI').value;
-  const alpn = document.getElementById('modalALPN').value.split(',').map(s => s.trim()).filter(Boolean);
-  const minVer = document.getElementById('modalMinVersion').value;
-  const sniffingEnabled = document.getElementById('modalSniffingEnabled').checked;
-  const metadataOnly = document.getElementById('modalMetadataOnly').checked;
-  const destOverride = Array.from(document.querySelectorAll('#configModal .checkbox-group input[type="checkbox"]:checked')).map(cb => cb.value);
-
-  // Validate
+  var protocol = document.getElementById('modalProtocol').value;
+  var uuid = document.getElementById('modalUUID').value;
+  var flow = document.getElementById('modalFlow').value;
+  var network = document.getElementById('modalNetwork').value;
+  var path = document.getElementById('modalPath').value;
+  var host = document.getElementById('modalHost').value;
+  var grpcService = document.getElementById('modalGRPCServiceName').value;
+  var security = document.getElementById('modalSecurity').value;
+  var sni = document.getElementById('modalSNI').value;
+  var alpn = document.getElementById('modalALPN').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var minVer = document.getElementById('modalMinVersion').value;
+  var sniffingEnabled = document.getElementById('modalSniffingEnabled').checked;
+  var metadataOnly = document.getElementById('modalMetadataOnly').checked;
+  var destOverride = Array.from(document.querySelectorAll('#configModal .checkbox-group input[type="checkbox"]:checked')).map(function(cb) { return cb.value; });
   if (!uuid) { showToast('❌ UUID/密码不能为空', 'error'); return; }
-
-  const payload = {
-    protocol,
-    settings: {
-      clients: [{ id: uuid, flow: flow || '' }],
-      decryption: 'none'
-    },
+  var payload = {
+    protocol: protocol,
+    settings: { clients: [{ id: uuid, flow: flow || '' }], decryption: 'none' },
     streamSettings: {
-      network,
-      security,
+      network: network, security: security,
       wsSettings: { path: path || '/', headers: { Host: host || '' } },
       grpcSettings: { serviceName: grpcService || '' },
-      tlsSettings: {
-        serverName: sni || '',
-        alpn: alpn.length > 0 ? alpn : ['h2', 'http/1.1'],
-        minVersion: minVer || '1.2'
-      }
+      tlsSettings: { serverName: sni || '', alpn: alpn.length > 0 ? alpn : ['h2', 'http/1.1'], minVersion: minVer || '1.2' }
     },
-    sniffing: {
-      enabled: sniffingEnabled,
-      destOverride: destOverride.length > 0 ? destOverride : ['http', 'tls'],
-      metadataOnly: metadataOnly
-    }
+    sniffing: { enabled: sniffingEnabled, destOverride: destOverride.length > 0 ? destOverride : ['http', 'tls'], metadataOnly: metadataOnly }
   };
-
-  // Show loading state
-  const btn = document.querySelector('#configModal .modal-footer .btn-primary');
-  const origText = btn.innerHTML;
+  var btn = document.querySelector('#configModal .modal-footer .btn-primary');
+  var origText = btn.innerHTML;
   btn.innerHTML = '⏳ 保存中...';
   btn.disabled = true;
-
   try {
-    const resp = await fetch('/api/update-inbound', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
+    var resp = await fetch('/api/update-inbound', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await resp.json();
     if (data.success) {
       showToast('✅ 配置已应用，正在热重启 Xray...', 'success');
       closeConfigModal();
-      // Refresh data after a delay
-      setTimeout(() => {
-        refreshConfig();
-        refreshSubscription();
-        loadSystemStatus();
-      }, 3000);
+      setTimeout(function() { refreshConfig(); refreshSubscription(); loadSystemStatus(); }, 3000);
     } else {
       showToast('❌ ' + (data.error || '保存失败'), 'error');
     }
-  } catch (err) {
-    showToast('❌ ' + err.message, 'error');
-  } finally {
-    btn.innerHTML = origText;
-    btn.disabled = false;
-  }
+  } catch (err) { showToast('❌ ' + err.message, 'error'); }
+  finally { btn.innerHTML = origText; btn.disabled = false; }
 }
 
-// ================================================================
-// RESTART ARGO
-// ================================================================
+// ---- Restart Argo ----
 async function restartArgo() {
   if (!confirm('确定要重启 Argo 隧道吗？')) return;
   showToast('⟳ 正在重启 Argo 隧道...', 'info');
   try {
-    const resp = await fetch('/api/restart-argo', { method: 'POST' });
-    const data = await resp.json();
-    if (data.success) {
-      showToast('✅ Argo 隧道正在重启', 'success');
-      setTimeout(loadSystemStatus, 5000);
-    }
-  } catch (err) {
-    showToast('❌ ' + err.message, 'error');
-  }
+    var resp = await fetch('/api/restart-argo', { method: 'POST' });
+    var data = await resp.json();
+    if (data.success) { showToast('✅ Argo 隧道正在重启', 'success'); setTimeout(loadSystemStatus, 5000); }
+  } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 
-// ================================================================
-// REFRESH SUBSCRIPTION
-// ================================================================
+// ---- Refresh subscription ----
 async function refreshSubscription() {
-  showToast('⟳ 正在刷新订阅...', 'info');
+  showToast('⟳ 刷新订阅...', 'info');
   try {
-    const resp = await fetch('/api/config');
-    const data = await resp.json();
-    const host = window.location.origin;
-    document.getElementById('subUrlDisplay').textContent = host + '/' + (data.subPath || 'sub3');
+    var resp = await fetch('/api/config');
+    var data = await resp.json();
+    document.getElementById('subUrlDisplay').textContent = window.location.origin + '/' + (data.subPath || 'sub3');
     showToast('✅ 订阅刷新完成', 'success');
-  } catch (err) {
-    showToast('❌ 刷新失败', 'error');
-  }
+  } catch (err) { showToast('❌ 刷新失败', 'error'); }
 }
 
-// ================================================================
-// REFRESH CONFIG
-// ================================================================
+// ---- Refresh config ----
 async function refreshConfig() {
   try {
-    const resp = await fetch('/api/inbound-config');
-    const data = await resp.json();
+    var resp = await fetch('/api/inbound-config');
+    var data = await resp.json();
     document.getElementById('cfgProtocol').textContent = (data.protocol || 'vless').toUpperCase();
-    document.getElementById('cfgNetwork').textContent = (data.streamSettings?.network || 'ws').toUpperCase();
-    document.getElementById('cfgSecurity').textContent = data.streamSettings?.security || 'none';
-    document.getElementById('cfgPath').textContent = data.streamSettings?.wsSettings?.path || '-';
-    document.getElementById('cfgUUID').textContent = maskUUID(data.settings?.clients?.[0]?.id || '-');
-    document.getElementById('cfgSniffing').textContent = data.sniffing?.enabled ? '✅ 启用' : '❌ 禁用';
-    document.getElementById('cfgSNI').textContent = data.streamSettings?.tlsSettings?.serverName || '-';
-  } catch (err) {
-    console.error('refreshConfig error:', err);
-  }
+    document.getElementById('cfgNetwork').textContent = ((data.streamSettings && data.streamSettings.network) || 'ws').toUpperCase();
+    document.getElementById('cfgSecurity').textContent = (data.streamSettings && data.streamSettings.security) || 'none';
+    document.getElementById('cfgPath').textContent = (data.streamSettings && data.streamSettings.wsSettings && data.streamSettings.wsSettings.path) || '-';
+    document.getElementById('cfgUUID').textContent = maskUUID((data.settings && data.settings.clients && data.settings.clients[0] && data.settings.clients[0].id) || '-');
+    document.getElementById('cfgSniffing').textContent = data.sniffing && data.sniffing.enabled ? '✅ 启用' : '❌ 禁用';
+    document.getElementById('cfgSNI').textContent = (data.streamSettings && data.streamSettings.tlsSettings && data.streamSettings.tlsSettings.serverName) || '-';
+  } catch (err) { console.error('refreshConfig error:', err); }
 }
 
-// ================================================================
-// LOAD SYSTEM STATUS
-// ================================================================
+// ---- Load server IP (previously not connected) ----
+async function loadServerIP() {
+  try {
+    var resp = await fetch('/api/server-ip');
+    var data = await resp.json();
+    if (data.ip) {
+      document.getElementById('sysServerIP').textContent = data.ip + (data.country ? ' (' + data.country + ')' : '');
+    } else {
+      document.getElementById('sysServerIP').textContent = '获取失败';
+    }
+  } catch (e) { document.getElementById('sysServerIP').textContent = '获取失败'; }
+}
+
+// ---- Load CFIP list (previously not connected) ----
+function loadCFIP() {
+  fetch('/api/config')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var cfipBody = document.getElementById('cfipBody');
+      cfipBody.innerHTML = '';
+      var list = data.cfip || [];
+      if (list.length === 0) {
+        cfipBody.innerHTML = '<tr><td colspan="4" class="text-center text-[var(--text-muted)] py-6">暂无配置</td></tr>';
+        return;
+      }
+      list.forEach(function(item, i) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + (i + 1) + '</td><td>' + item[0] + '</td><td>' + item[1] + '</td><td><span class="badge badge-info">环境变量</span></td>';
+        cfipBody.appendChild(tr);
+      });
+    })
+    .catch(function() {});
+}
+
+function refreshCFIP() { loadCFIP(); showToast('✅ CFIP 列表已刷新', 'success'); }
+
+// ---- Load full config table (previously not connected) ----
+function loadFullConfig() {
+  fetch('/api/config')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var table = document.getElementById('fullConfigTable');
+      var rows = [
+        ['服务端口', data.port, null],
+        ['订阅路径', '/' + (data.subPath || 'sub3'), null],
+        ['当前协议', data.protocol || '-', null],
+        ['传输协议', data.network || '-', null],
+        ['安全设置', data.security || '-', null],
+        ['WS 路径', data.wsPath || '-', null],
+        ['嗅探状态', data.sniffingEnabled ? '启用' : '禁用', null],
+        ['UUID', maskUUID(data.uuid || '-'), data.uuid],
+        ['Argo 域名', data.argoDomain || '临时隧道', null],
+        ['Argo 端口', data.argoPort, null],
+        ['CFIP 数量', (data.cfip && data.cfip.length) || 0, null],
+        ['Nezha 服务器', data.nezhaServer || '未配置', null],
+        ['Nezha 端口', data.nezhaPort || '-', null],
+        ['自动保活', data.autoAccess ? '开启' : '关闭', null],
+        ['上传地址', data.uploadUrl || '未配置', null],
+        ['项目域名', data.projectUrl || '未配置', null],
+        ['节点名称', data.name || '默认', null],
+        ['Hot Reload 日志', data.lastConfigLog || '-', null]
+      ];
+      table.innerHTML = '';
+      rows.forEach(function(item) {
+        var tr = document.createElement('tr');
+        var val = item[2] || item[1];
+        tr.innerHTML = '<td>' + item[0] + '</td><td>' + item[1] + (item[2] ? ' <button class="btn btn-xs btn-ghost" onclick="copyText(\'' + item[2].replace(/'/g, "\\'") + '\')">📋</button>' : '') + '</td>';
+        table.appendChild(tr);
+      });
+    })
+    .catch(function() {});
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(function() { showToast('✅ 已复制', 'success'); });
+}
+
+// ---- Load system status ----
 async function loadSystemStatus() {
   try {
-    const resp = await fetch('/api/system-status');
-    const data = await resp.json();
-
-    // Stats row
-    const xrayOk = data.processes?.xray;
-    const argoOk = data.processes?.argo;
-
+    var resp = await fetch('/api/system-status');
+    var data = await resp.json();
+    var xrayOk = data.processes && data.processes.xray;
+    var argoOk = data.processes && data.processes.argo;
     document.getElementById('xrayStatus').textContent = xrayOk ? '运行中' : '离线';
     document.getElementById('xrayDot').className = 'status-dot ' + (xrayOk ? 'green' : 'red');
-
     document.getElementById('argoStatus').textContent = argoOk ? '运行中' : '离线';
     document.getElementById('argoDot').className = 'status-dot ' + (argoOk ? 'green' : 'red');
-
     document.getElementById('headerStatusDot').className = 'status-dot ' + (xrayOk && argoOk ? 'green' : 'yellow');
     document.getElementById('headerStatusText').textContent = xrayOk && argoOk ? '运行中' : '部分离线';
-
-    // Memory
     if (data.memory) {
       document.getElementById('memStatus').textContent = data.memory.used + '/' + data.memory.total + ' MB';
       document.getElementById('sysMemDetail').textContent = data.memory.used + ' / ' + data.memory.total + ' MB (' + data.memory.percent + '%)';
       document.getElementById('sysMemBar').style.width = Math.min(parseFloat(data.memory.percent), 100) + '%';
     }
-
-    // CPU
     if (data.cpu) {
       document.getElementById('cpuStatus').textContent = data.cpu.count + ' 核';
       document.getElementById('sysCpuDetail').textContent = data.cpu.count + ' 核';
       document.getElementById('sysCpuModel').textContent = data.cpu.model || '-';
     }
-
-    // Uptime
     if (data.uptime) {
-      const days = Math.floor(data.uptime / 86400);
-      const hours = Math.floor((data.uptime % 86400) / 3600);
-      const mins = Math.floor((data.uptime % 3600) / 60);
+      var days = Math.floor(data.uptime / 86400);
+      var hours = Math.floor((data.uptime % 86400) / 3600);
+      var mins = Math.floor((data.uptime % 3600) / 60);
       document.getElementById('sysUptime').textContent = days + 'd ' + hours + 'h ' + mins + 'm';
     }
-
-    // Platform / Arch
     document.getElementById('sysPlatform').textContent = data.platform || '-';
     document.getElementById('sysArch').textContent = data.arch || '-';
     document.getElementById('sysHostname').textContent = data.hostname || '-';
-
-    // Process status in System tab
-    document.getElementById('sysXrayStatus').innerHTML = xrayOk
-      ? '<span class="badge badge-success">运行中</span>'
-      : '<span class="badge badge-danger">离线</span>';
-    document.getElementById('sysArgoStatus').innerHTML = argoOk
-      ? '<span class="badge badge-success">运行中</span>'
-      : '<span class="badge badge-danger">离线</span>';
-
-    // Argo domain
-    const domain = data.argoDomain || '-';
+    document.getElementById('sysXrayStatus').innerHTML = xrayOk ? '<span class="badge badge-success">运行中</span>' : '<span class="badge badge-danger">离线</span>';
+    document.getElementById('sysArgoStatus').innerHTML = argoOk ? '<span class="badge badge-success">运行中</span>' : '<span class="badge badge-danger">离线</span>';
+    var domain = data.argoDomain || '-';
     document.getElementById('argoDomain').textContent = domain;
     document.getElementById('sysArgoLink').textContent = domain;
     document.getElementById('sysArgoLink').href = 'https://' + domain;
-
-    // Node protocol
     document.getElementById('nodeProtocol').textContent = document.getElementById('cfgProtocol').textContent || 'VLESS';
-
-    // Last config log
-    if (data.lastConfigLog) {
-      document.getElementById('cfgLog').textContent = data.lastConfigLog;
-    }
-
-    // Action log
-    const logEl = document.getElementById('actionLog');
-    const timestamp = new Date().toLocaleTimeString();
-    const statusLine = `[${timestamp}] Xray: ${xrayOk ? '✅' : '❌'} | Argo: ${argoOk ? '✅' : '❌'} | MEM: ${data.memory?.percent || '-'}% | Domain: ${domain}`;
-    if (logEl.textContent === '等待操作日志...') {
-      logEl.textContent = statusLine;
-    } else {
-      const lines = logEl.textContent.split('\n');
-      lines.unshift(statusLine);
-      if (lines.length > 20) lines.pop();
-      logEl.textContent = lines.join('\n');
-    }
-
-  } catch (err) {
-    console.error('loadSystemStatus error:', err);
-  }
+    if (data.lastConfigLog) { document.getElementById('cfgLog').textContent = data.lastConfigLog; }
+    var logEl = document.getElementById('actionLog');
+    var timestamp = new Date().toLocaleTimeString();
+    var statusLine = '[' + timestamp + '] Xray: ' + (xrayOk ? '✅' : '❌') + ' | Argo: ' + (argoOk ? '✅' : '❌') + ' | MEM: ' + (data.memory ? data.memory.percent : '-') + '% | Domain: ' + domain;
+    if (logEl.textContent === '等待操作日志...') { logEl.textContent = statusLine; }
+    else { var lines = logEl.textContent.split('\n'); lines.unshift(statusLine); if (lines.length > 20) lines.pop(); logEl.textContent = lines.join('\n'); }
+  } catch (err) { console.error('loadSystemStatus error:', err); }
 }
 
-// ================================================================
-// LOAD NODES
-// ================================================================
+// ---- Load nodes ----
 async function loadNodes() {
   try {
-    const resp = await fetch('/api/nodes');
-    const data = await resp.json();
+    var resp = await fetch('/api/nodes');
+    var data = await resp.json();
     document.getElementById('nodesLoading').style.display = 'none';
-    const list = document.getElementById('nodesList');
+    var list = document.getElementById('nodesList');
     list.innerHTML = '';
-
-    const nodes = data.nodes || [];
-    if (nodes.length === 0) {
-      list.innerHTML = '<div class="text-center py-8 text-[var(--text-muted)]">暂无节点数据，等待服务启动完成</div>';
-      return;
-    }
-
-    nodes.forEach((node, idx) => {
-      let protocol = 'unknown';
-      let detail = node;
-      const match = node.match(/^(vless|vmess|trojan|hysteria2|tuic):\/\//i);
+    var nodes = data.nodes || [];
+    if (nodes.length === 0) { list.innerHTML = '<div class="text-center py-8 text-[var(--text-muted)]">暂无节点，等待启动</div>'; return; }
+    nodes.forEach(function(node) {
+      var protocol = 'unknown';
+      var detail = node;
+      var match = node.match(/^(vless|vmess|trojan|hysteria2|tuic):\/\//i);
       if (match) {
         protocol = match[1].toLowerCase();
         try {
-          if (protocol === 'vmess') {
-            const decoded = atob(node.replace('vmess://', ''));
-            const obj = JSON.parse(decoded);
-            detail = (obj.ps || 'unnamed') + ' → ' + obj.add + ':' + obj.port;
-          } else {
-            const url = new URL(node);
-            const hash = url.hash ? decodeURIComponent(url.hash.substring(1)) : 'unnamed';
-            detail = hash + ' → ' + url.hostname + ':' + url.port;
-          }
+          if (protocol === 'vmess') { var decoded = atob(node.replace('vmess://', '')); var obj = JSON.parse(decoded); detail = (obj.ps || 'unnamed') + ' → ' + obj.add + ':' + obj.port; }
+          else { var url = new URL(node); var hash = url.hash ? decodeURIComponent(url.hash.substring(1)) : 'unnamed'; detail = hash + ' → ' + url.hostname + ':' + url.port; }
         } catch(e) { detail = node; }
       }
-
-      const colMap = { vless:'#5b6ef5', vmess:'#22c55e', trojan:'#ef4444', hysteria2:'#eab308', tuic:'#3b82f6' };
-      const div = document.createElement('div');
+      var colMap = { vless:'#5b6ef5', vmess:'#22c55e', trojan:'#ef4444', hysteria2:'#eab308', tuic:'#3b82f6' };
+      var div = document.createElement('div');
       div.className = 'flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-4 py-3 border border-[var(--border)] hover:border-[var(--accent)] transition-colors gap-3 flex-wrap';
-      div.innerHTML = `
-        <div class="flex items-center gap-3 min-w-0 flex-1">
-          <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style="background:${colMap[protocol] || '#5a6278'}20;color:${colMap[protocol] || '#5a6278'}">${protocol.substring(0,2).toUpperCase()}</span>
-          <div class="min-w-0">
-            <div class="text-sm font-semibold">${protocol.toUpperCase()}</div>
-            <div class="text-xs text-[var(--text-muted)] font-mono truncate max-w-[300px]" title="${escapeHtml(node)}">${escapeHtml(detail)}</div>
-          </div>
-        </div>
-        <button class="btn btn-xs btn-ghost copy-node-btn" data-node="${node.replace(/"/g, '&#34;').replace(/'/g, '&#39;')}">📋 复制</button>
-      `;
+      div.innerHTML = '<div class="flex items-center gap-3 min-w-0 flex-1"><span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style="background:' + (colMap[protocol] || '#5a6278') + '20;color:' + (colMap[protocol] || '#5a6278') + '">' + protocol.substring(0,2).toUpperCase() + '</span><div class="min-w-0"><div class="text-sm font-semibold">' + protocol.toUpperCase() + '</div><div class="text-xs text-[var(--text-muted)] font-mono truncate max-w-[300px]">' + escapeHtml(detail) + '</div></div></div><button class="btn btn-xs btn-ghost copy-node-btn" data-node="' + node.replace(/"/g, '&#34;').replace(/'/g, '&#39;') + '">📋 复制</button>';
       list.appendChild(div);
-
-      // Attach copy handler
       div.querySelector('.copy-node-btn').addEventListener('click', function() {
-        const nodeText = this.dataset.node;
-        navigator.clipboard.writeText(nodeText).then(() => {
-          showToast('✅ 节点已复制', 'success');
-        }).catch(() => {
-          // Fallback
-          const ta = document.createElement('textarea');
-          ta.value = nodeText;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          showToast('✅ 节点已复制', 'success');
+        var nodeText = this.dataset.node;
+        navigator.clipboard.writeText(nodeText).then(function() { showToast('✅ 已复制', 'success'); }).catch(function() {
+          var ta = document.createElement('textarea'); ta.value = nodeText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('✅ 已复制', 'success');
         });
       });
     });
-
-  } catch (err) {
-    document.getElementById('nodesLoading').innerHTML = '<div class="text-center py-8 text-[var(--danger)]">加载失败: ' + escapeHtml(err.message) + '</div>';
-    console.error('loadNodes error:', err);
-  }
+  } catch (err) { document.getElementById('nodesLoading').innerHTML = '<div class="text-center py-8 text-[var(--danger)]">加载失败: ' + escapeHtml(err.message) + '</div>'; }
 }
 
-// ================================================================
-// AUTO RELOAD LOOP
-// ================================================================
-let refreshCounter = 0;
-
+// ---- Initial load ----
 async function initialLoad() {
-  // Load config summary
   await refreshConfig();
-
-  // Load subscription URL
   try {
-    const resp = await fetch('/api/config');
-    const data = await resp.json();
-    const host = window.location.origin;
-    document.getElementById('subUrlDisplay').textContent = host + '/' + (data.subPath || 'sub3');
+    var resp = await fetch('/api/config');
+    var data = await resp.json();
+    document.getElementById('subUrlDisplay').textContent = window.location.origin + '/' + (data.subPath || 'sub3');
   } catch(e) {}
-
-  // Load nodes
   await loadNodes();
-
-  // Load system status
   await loadSystemStatus();
+  loadServerIP();      // [NEW] connected to /api/server-ip
+  loadCFIP();          // [NEW] connected to /api/config → cfip
+  loadFullConfig();    // [NEW] connected to /api/config → full table
 }
 
-// Initial load
 initialLoad();
 
-// Auto refresh every 15 seconds
-setInterval(() => {
+var refreshCounter = 0;
+setInterval(function() {
   refreshCounter++;
   loadSystemStatus();
-  if (refreshCounter % 4 === 0) {
-    refreshConfig();
-    loadNodes();
-  }
+  if (refreshCounter % 4 === 0) { refreshConfig(); loadNodes(); loadCFIP(); loadFullConfig(); }
 }, 15000);
 
 </script>

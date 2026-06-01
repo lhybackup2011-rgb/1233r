@@ -6,31 +6,36 @@ const fs = require("fs");
 const path = require("path");
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
-const UPLOAD_URL = process.env.UPLOAD_URL || '';      // 节点或订阅自动上传地址,需填写部署Merge-sub项目后的首页地址,例如：https://merge.xxx.com
-const PROJECT_URL = process.env.PROJECT_URL || '';    // 需要上传订阅或保活时需填写项目分配的url,例如：https://google.com
-const AUTO_ACCESS = process.env.AUTO_ACCESS || false; // false关闭自动保活，true开启,需同时填写PROJECT_URL变量
-const FILE_PATH = process.env.FILE_PATH || '.tmp';   // 运行目录,sub节点文件保存目录
-const SUB_PATH = process.env.SUB_PATH || 'sub3';       // 订阅路径
-const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;        // http服务订阅端口
-const UUID = process.env.UUID || 'fd6f5009-39d7-4d93-9176-3cbb69870987'; // 使用哪吒v1,在不同的平台运行需修改UUID,否则会覆盖
-const NEZHA_SERVER = process.env.NEZHA_SERVER || '';        // 哪吒v1填写形式: nz.abc.com:8008  哪吒v0填写形式：nz.abc.com
-const NEZHA_PORT = process.env.NEZHA_PORT || '';            // 使用哪吒v1请留空，哪吒v0需填写
-const NEZHA_KEY = process.env.NEZHA_KEY || '';              // 哪吒v1的NZ_CLIENT_SECRET或哪吒v0的agent密钥
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'laoda.kobe824.icu';          // 固定隧道域名,留空即启用临时隧道
-const ARGO_AUTH = process.env.ARGO_AUTH || 'eyJhIjoiOTEzMWQxMTMwZjQ2NzFjNzdjNDA1MTM4NTNhMTEzMTYiLCJ0IjoiNjBiZWUyYjMtNjljOC00ZDA1LWI1MjctYWMyMjQ2ZGU2NDQ4IiwicyI6IlpEZGpZelZoTnpRdFpqazVNQzAwTm1Wa0xXRm1OVEl0TUdFMU5UTTJaall3TkRFMiJ9';              // 固定隧道密钥json或token,留空即启用临时隧道,json获取地址：https://json.zone.id
-const ARGO_PORT = process.env.ARGO_PORT || 8510;            // 固定隧道端口,使用token需在cloudflare后台设置和这里一致
-const CFIP=[["172.64.145.13", 443],["104.20.17.244",443]]; // 节点优选域名或优选ip列表,格式: [["ip或域名", 端口号], ...]
-const NAME = process.env.NAME || '';                        // 节点名称
+const spawn = require('child_process').spawn;
 
-// 创建运行文件夹
-if (!fs.existsSync(FILE_PATH)) {
-  fs.mkdirSync(FILE_PATH);
-  console.log(`${FILE_PATH} is created`);
-} else {
-  console.log(`${FILE_PATH} already exists`);
-}
+// ============================================================
+// 1. ENVIRONMENT VARIABLES
+// ============================================================
+const UPLOAD_URL = process.env.UPLOAD_URL || '';
+const PROJECT_URL = process.env.PROJECT_URL || '';
+const AUTO_ACCESS = process.env.AUTO_ACCESS || false;
+const FILE_PATH = process.env.FILE_PATH || '.tmp';
+const SUB_PATH = process.env.SUB_PATH || 'sub3';
+const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
+const UUID = process.env.UUID || 'fd6f5009-39d7-4d93-9176-3cbb69870987';
+const NEZHA_SERVER = process.env.NEZHA_SERVER || '';
+const NEZHA_PORT = process.env.NEZHA_PORT || '';
+const NEZHA_KEY = process.env.NEZHA_KEY || '';
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'laoda.kobe824.icu';
+const ARGO_AUTH = process.env.ARGO_AUTH || 'eyJhIjoiOTEzMWQxMTMwZjQ2NzFjNzdjNDA1MTM4NTNhMTEzMTYiLCJ0IjoiNjBiZWUyYjMtNjljOC00ZDA1LWI1MjctYWMyMjQ2ZGU2NDQ4IiwicyI6IlpEZGpZelZoTnpRdFpqazVNQzAwTm1Wa0xXRm1OVEl0TUdFMU5UTTJaall3TkRFMiJ9';
+const ARGO_PORT = process.env.ARGO_PORT || 8510;
+const CFIP = process.env.CFIP ? process.env.CFIP.split(',').map(e => {
+  const parts = e.trim().split(':');
+  return [parts[0], parseInt(parts[1] || '443')];
+}) : [["172.64.145.13", 443], ["104.20.17.244", 443]];
+const NAME = process.env.NAME || '';
 
-// 生成随机6位字符文件名
+app.use(express.json({ limit: '1mb' }));
+app.set('trust proxy', true); // For correct req.ip behind proxies
+
+// ============================================================
+// 2. FILE & PROCESS GLOBALS
+// ============================================================
 function generateRandomName() {
   const characters = 'abcdefghijklmnopqrstuvwxyz';
   let result = '';
@@ -40,7 +45,6 @@ function generateRandomName() {
   return result;
 }
 
-// 全局常量
 const npmName = generateRandomName();
 const webName = generateRandomName();
 const botName = generateRandomName();
@@ -53,41 +57,577 @@ let subPath = path.join(FILE_PATH, 'sub.txt');
 let listPath = path.join(FILE_PATH, 'list.txt');
 let bootLogPath = path.join(FILE_PATH, 'boot.log');
 let configPath = path.join(FILE_PATH, 'config.json');
-let subTxtCache = ''; // 缓存订阅文本用于API返回
+let subTxtCache = '';
 
-// 如果订阅器上存在历史运行节点则先删除
+// Create FILE_PATH if not exists
+if (!fs.existsSync(FILE_PATH)) {
+  fs.mkdirSync(FILE_PATH, { recursive: true });
+  console.log(`${FILE_PATH} is created`);
+}
+
+// ============================================================
+// 3. 3X-UI DATA MODEL - currentInboundConfig
+// ============================================================
+let currentArgoDomain = ARGO_DOMAIN || '';
+let lastConfigLog = '';
+
+const currentInboundConfig = {
+  protocol: 'vless',
+  port: ARGO_PORT,
+  settings: {
+    clients: [{ id: UUID, flow: '' }],
+    decryption: 'none',
+    fallbacks: [
+      { dest: 3001 },
+      { path: "/vless-argo", dest: 3002 },
+      { path: "/vmess-argo", dest: 3003 },
+      { path: "/trojan-argo", dest: 3004 }
+    ]
+  },
+  streamSettings: {
+    network: 'ws',
+    security: 'none',
+    wsSettings: {
+      path: '/vless-argo',
+      headers: { Host: '' }
+    },
+    grpcSettings: {
+      serviceName: ''
+    },
+    tlsSettings: {
+      serverName: '',
+      alpn: ['h2', 'http/1.1'],
+      minVersion: '1.2'
+    }
+  },
+  sniffing: {
+    enabled: true,
+    destOverride: ['http', 'tls', 'quic'],
+    metadataOnly: false
+  }
+};
+
+function getCurrentInboundClone() {
+  return JSON.parse(JSON.stringify(currentInboundConfig));
+}
+
+// ============================================================
+// 4. GEOLOCATION-BASED CF OPTIMAL IP DICTIONARY
+// ============================================================
+const CF_OPTIMAL_IPS = {
+  'TW': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'HK': [['172.64.0.0', 443], ['104.16.0.0', 443], ['104.18.0.0', 443]],
+  'JP': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'US': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'SG': [['172.64.0.0', 443], ['104.16.0.0', 443], ['104.18.0.0', 443]],
+  'KR': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'GB': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'DE': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'FR': [['104.16.0.0', 443], ['104.18.0.0', 443], ['172.64.0.0', 443]],
+  'CA': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'AU': [['172.64.0.0', 443], ['104.16.0.0', 443], ['104.18.0.0', 443]],
+  'IN': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'RU': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'BR': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'ZA': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]],
+  'AE': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'SA': [['104.18.0.0', 443], ['172.64.0.0', 443], ['104.16.0.0', 443]],
+  'default': [['104.16.0.0', 443], ['172.64.0.0', 443], ['104.18.0.0', 443]]
+};
+
+async function getUserGeoInfo(userIp) {
+  // Try ip-api.com first
+  try {
+    const resp = await axios.get(`http://ip-api.com/json/${userIp}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 3000
+    });
+    if (resp.data && resp.data.status === 'success') {
+      return {
+        country: resp.data.countryCode || '',
+        isp: (resp.data.org || '').replace(/\s+/g, '_'),
+        query: resp.data.query || userIp
+      };
+    }
+  } catch (e) {
+    // fall through
+  }
+
+  // Fallback: ipinfo.io
+  try {
+    const resp = await axios.get(`https://ipinfo.io/${userIp}/json`, {
+      timeout: 3000
+    });
+    if (resp.data && resp.data.country) {
+      return {
+        country: resp.data.country || '',
+        isp: (resp.data.org || '').replace(/\s+/g, '_'),
+        query: resp.data.ip || userIp
+      };
+    }
+  } catch (e) {
+    // fall through
+  }
+
+  return { country: '', isp: '', query: userIp };
+}
+
+function getOptimalIPs(countryCode) {
+  const list = CF_OPTIMAL_IPS[countryCode] || CF_OPTIMAL_IPS['default'];
+  return list.slice(0, 3);
+}
+
+// ============================================================
+// 5. FILE DOWNLOAD & ARCHITECTURE DETECTION
+// ============================================================
+function getSystemArchitecture() {
+  const arch = os.arch();
+  if (arch === 'arm' || arch === 'arm64' || arch === 'aarch64') {
+    return 'arm';
+  }
+  return 'amd';
+}
+
+function downloadFile(fileName, fileUrl) {
+  return new Promise((resolve, reject) => {
+    const filePath = fileName;
+    if (!fs.existsSync(FILE_PATH)) {
+      fs.mkdirSync(FILE_PATH, { recursive: true });
+    }
+    const writer = fs.createWriteStream(filePath);
+    axios({
+      method: 'get',
+      url: fileUrl,
+      responseType: 'stream',
+      timeout: 30000
+    }).then(response => {
+      response.data.pipe(writer);
+      writer.on('finish', () => {
+        writer.close();
+        console.log(`Downloaded ${path.basename(filePath)} successfully`);
+        resolve(filePath);
+      });
+      writer.on('error', err => {
+        fs.unlink(filePath, () => {});
+        reject(`Download ${path.basename(filePath)} failed: ${err.message}`);
+      });
+    }).catch(err => {
+      reject(`Download ${path.basename(filePath)} failed: ${err.message}`);
+    });
+  });
+}
+
+function ensureFilePermissions(filePath) {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(filePath)) {
+      fs.chmod(filePath, 0o775, (err) => {
+        if (err) {
+          console.error(`chmod failed for ${filePath}: ${err.message}`);
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    } else {
+      reject(new Error(`File not found: ${filePath}`));
+    }
+  });
+}
+
+async function ensureBinaryExists(binaryPath, architecture, type) {
+  if (fs.existsSync(binaryPath)) {
+    await ensureFilePermissions(binaryPath);
+    return true;
+  }
+  console.log(`Binary ${path.basename(binaryPath)} missing, re-downloading...`);
+  const arch = architecture || getSystemArchitecture();
+  let url;
+  if (type === 'web') {
+    url = arch === 'arm' ? "https://arm64.ssss.nyc.mn/web" : "https://amd64.ssss.nyc.mn/web";
+  } else if (type === 'bot') {
+    url = arch === 'arm' ? "https://arm64.ssss.nyc.mn/bot" : "https://amd64.ssss.nyc.mn/bot";
+  } else if (type === 'npm' || type === 'agent') {
+    url = arch === 'arm' ? "https://arm64.ssss.nyc.mn/agent" : "https://amd64.ssss.nyc.mn/agent";
+  } else if (type === 'php' || type === 'v1') {
+    url = arch === 'arm' ? "https://arm64.ssss.nyc.mn/v1" : "https://amd64.ssss.nyc.mn/v1";
+  } else {
+    return false;
+  }
+  try {
+    await downloadFile(binaryPath, url);
+    await ensureFilePermissions(binaryPath);
+    return true;
+  } catch (err) {
+    console.error(`Failed to re-download binary: ${err}`);
+    return false;
+  }
+}
+
+function getFilesForArchitecture(architecture) {
+  let baseFiles;
+  if (architecture === 'arm') {
+    baseFiles = [
+      { fileName: webPath, fileUrl: "https://arm64.ssss.nyc.mn/web" },
+      { fileName: botPath, fileUrl: "https://arm64.ssss.nyc.mn/bot" }
+    ];
+  } else {
+    baseFiles = [
+      { fileName: webPath, fileUrl: "https://amd64.ssss.nyc.mn/web" },
+      { fileName: botPath, fileUrl: "https://amd64.ssss.nyc.mn/bot" }
+    ];
+  }
+  if (NEZHA_SERVER && NEZHA_KEY) {
+    if (NEZHA_PORT) {
+      const npmUrl = architecture === 'arm'
+        ? "https://arm64.ssss.nyc.mn/agent"
+        : "https://amd64.ssss.nyc.mn/agent";
+      baseFiles.unshift({ fileName: npmPath, fileUrl: npmUrl });
+    } else {
+      const phpUrl = architecture === 'arm'
+        ? "https://arm64.ssss.nyc.mn/v1"
+        : "https://amd64.ssss.nyc.mn/v1";
+      baseFiles.unshift({ fileName: phpPath, fileUrl: phpUrl });
+    }
+  }
+  return baseFiles;
+}
+
+// ============================================================
+// 6. XRAY CONFIG GENERATION (dynamic from currentInboundConfig)
+// ============================================================
+function buildXrayConfig() {
+  const cfg = getCurrentInboundClone();
+  
+  // Build the main inbound (public facing)
+  const mainInbound = {
+    port: cfg.port || ARGO_PORT,
+    protocol: cfg.protocol || 'vless',
+    settings: {
+      clients: cfg.settings.clients.map(c => ({
+        id: c.id,
+        flow: cfg.protocol === 'vless' && c.flow ? c.flow : undefined,
+        password: cfg.protocol === 'trojan' ? c.id : undefined,
+        level: 0
+      })),
+      decryption: cfg.settings.decryption || 'none',
+      fallbacks: cfg.settings.fallbacks || []
+    },
+    sniffing: cfg.sniffing.enabled ? {
+      enabled: true,
+      destOverride: cfg.sniffing.destOverride || ['http', 'tls', 'quic'],
+      metadataOnly: cfg.sniffing.metadataOnly || false
+    } : undefined
+  };
+
+  // [BUG FIX 1]: Argo Tunnel already decrypts TLS at the edge.
+  // Force security to "none" for local Xray config — TLS would crash Xray due to missing certs.
+  mainInbound.streamSettings = buildStreamSettings(cfg);
+  mainInbound.streamSettings.security = 'none';
+  delete mainInbound.streamSettings.tlsSettings;
+
+  // Clean up undefined fields
+  if (mainInbound.settings.clients[0] && !mainInbound.settings.clients[0].flow) {
+    delete mainInbound.settings.clients[0].flow;
+  }
+  if (cfg.protocol !== 'trojan') {
+    mainInbound.settings.clients.forEach(c => { delete c.password; });
+  }
+  if (cfg.protocol === 'trojan') {
+    mainInbound.settings.clients.forEach(c => { delete c.flow; delete c.id; });
+  }
+
+  // [BUG FIX 2]: Use dynamic UUID from currentInboundConfig, not the static global UUID.
+  // This ensures main inbound and internal fallback ports use the SAME credential.
+  const dynamicId = cfg.settings.clients[0]?.id || UUID;
+
+  const internalInbounds = [
+    {
+      port: 3001, listen: "127.0.0.1",
+      protocol: "vless",
+      settings: { clients: [{ id: dynamicId }], decryption: "none" },
+      streamSettings: { network: "tcp", security: "none" }
+    },
+    {
+      port: 3002, listen: "127.0.0.1",
+      protocol: "vless",
+      settings: { clients: [{ id: dynamicId, level: 0 }], decryption: "none" },
+      streamSettings: { network: "ws", security: "none", wsSettings: { path: "/vless-argo" } },
+      sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
+    },
+    {
+      port: 3003, listen: "127.0.0.1",
+      protocol: "vmess",
+      settings: { clients: [{ id: dynamicId, alterId: 0 }] },
+      streamSettings: { network: "ws", wsSettings: { path: "/vmess-argo" } },
+      sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
+    },
+    {
+      port: 3004, listen: "127.0.0.1",
+      protocol: "trojan",
+      settings: { clients: [{ password: dynamicId }] },
+      streamSettings: { network: "ws", security: "none", wsSettings: { path: "/trojan-argo" } },
+      sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
+    }
+  ];
+
+  const config = {
+    log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
+    inbounds: [mainInbound, ...internalInbounds],
+    dns: { servers: ["https+local://8.8.8.8/dns-query"] },
+    outbounds: [
+      { protocol: "freedom", tag: "direct" },
+      { protocol: "blackhole", tag: "block" }
+    ]
+  };
+
+  return config;
+}
+
+function buildStreamSettings(cfg) {
+  const net = cfg.streamSettings.network || 'ws';
+  const security = cfg.streamSettings.security || 'none';
+  const base = { network: net, security: security };
+
+  if (net === 'ws') {
+    base.wsSettings = {
+      path: cfg.streamSettings.wsSettings.path || '/',
+      headers: { Host: cfg.streamSettings.wsSettings.headers.Host || currentArgoDomain }
+    };
+  } else if (net === 'grpc') {
+    base.grpcSettings = {
+      serviceName: cfg.streamSettings.grpcSettings.serviceName || ''
+    };
+  }
+
+  if (security === 'tls') {
+    base.tlsSettings = {
+      serverName: cfg.streamSettings.tlsSettings.serverName || currentArgoDomain,
+      alpn: cfg.streamSettings.tlsSettings.alpn || ['h2', 'http/1.1'],
+      minVersion: cfg.streamSettings.tlsSettings.minVersion || '1.2'
+    };
+  }
+
+  return base;
+}
+
+async function writeXrayConfig() {
+  const config = buildXrayConfig();
+  if (!fs.existsSync(FILE_PATH)) {
+    fs.mkdirSync(FILE_PATH, { recursive: true });
+  }
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  lastConfigLog = `[${new Date().toLocaleTimeString()}] Config updated: ${config.inbounds[0].protocol}@${config.inbounds[0].streamSettings.network}`;
+  console.log(`Xray config written to ${configPath}`);
+  return config;
+}
+
+// ============================================================
+// 7. PROCESS MANAGEMENT & HOT RESTART
+// ============================================================
+async function killProcess(procName) {
+  try {
+    if (process.platform === 'win32') {
+      await exec(`taskkill /f /im ${procName}.exe > nul 2>&1`);
+    } else {
+      // Use pkill with process name matching trick: [f]irst character prevents self-match
+      await exec(`pkill -f "[${procName.charAt(0)}]${procName.substring(1)}" > /dev/null 2>&1`);
+    }
+  } catch (e) {
+    // Process may already be dead, that's fine
+  }
+}
+
+async function launchProcess(cmd, args, name) {
+  return new Promise((resolve, reject) => {
+    try {
+      const fullCmd = args ? `${cmd} ${args}` : cmd;
+      const proc = spawn('sh', ['-c', `nohup ${fullCmd} >/dev/null 2>&1 &`], {
+        stdio: 'ignore',
+        detached: true
+      });
+      proc.unref();
+      console.log(`${name} process launched`);
+      resolve();
+    } catch (err) {
+      console.error(`Failed to launch ${name}: ${err.message}`);
+      reject(err);
+    }
+  });
+}
+
+async function hotRestartXray() {
+  const arch = getSystemArchitecture();
+  
+  // 1. Check binary exists, if not download it
+  await ensureBinaryExists(webPath, arch, 'web');
+  
+  // 2. Write new config
+  await writeXrayConfig();
+  
+  // 3. Kill old Xray process (async, non-blocking overall)
+  await killProcess(webName);
+  await new Promise(r => setTimeout(r, 500));
+  
+  // 4. Launch new Xray process
+  await launchProcess(webPath, `-c ${configPath}`, webName);
+  await new Promise(r => setTimeout(r, 1000));
+  
+  console.log(`Xray process (${webName}) hot restarted successfully`);
+}
+
+async function hotRestartArgo() {
+  const arch = getSystemArchitecture();
+  
+  // 1. Check binary exists
+  await ensureBinaryExists(botPath, arch, 'bot');
+  
+  // 2. Kill old Argo process
+  await killProcess(botName);
+  await new Promise(r => setTimeout(r, 500));
+  
+  // 3. Build Args
+  let args;
+  if (ARGO_AUTH && ARGO_DOMAIN) {
+    if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) {
+      args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token ${ARGO_AUTH}`;
+    } else if (ARGO_AUTH.match(/TunnelSecret/)) {
+      args = `tunnel --edge-ip-version auto --config ${FILE_PATH}/tunnel.yml run`;
+    } else {
+      args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${bootLogPath} --loglevel info --url http://localhost:${ARGO_PORT}`;
+    }
+  } else {
+    args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${bootLogPath} --loglevel info --url http://localhost:${ARGO_PORT}`;
+  }
+  
+  // 4. Launch
+  await launchProcess(botPath, args, botName);
+  await new Promise(r => setTimeout(r, 2000));
+  
+  console.log(`Argo process (${botName}) hot restarted successfully`);
+}
+
+// ============================================================
+// 8. SUBSCRIPTION LINK GENERATION (with Geo-IP optimization)
+// ============================================================
+async function generateOptimizedSubscription(userIp, countryCode) {
+  const geoInfo = countryCode 
+    ? { country: countryCode } 
+    : await getUserGeoInfo(userIp);
+  
+  const cc = geoInfo.country || '';
+  const optimalIPs = getOptimalIPs(cc);
+  const domain = currentArgoDomain || ARGO_DOMAIN || '';
+  const inbound = getCurrentInboundClone();
+  const proto = inbound.protocol;
+  const uuid = inbound.settings.clients[0]?.id || UUID;
+  const wsPath = inbound.streamSettings.wsSettings?.path || '/vless-argo';
+  const host = inbound.streamSettings.wsSettings?.headers?.Host || domain;
+  const security = inbound.streamSettings.security || 'none';
+  const nodeName = NAME || `Node-${cc || 'Global'}`;
+
+  let subTxt = '';
+  const usedIPs = optimalIPs.length > 0 ? optimalIPs : CFIP;
+
+  usedIPs.forEach((entry) => {
+    const cfip = entry[0];
+    const cfport = entry[1];
+    const encPath = encodeURIComponent(wsPath) + '?ed=2560';
+
+    if (proto === 'vless') {
+      subTxt += `vless://${uuid}@${cfip}:${cfport}?encryption=none&security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    } else if (proto === 'vmess') {
+      const vmessObj = {
+        v: '2', ps: nodeName, add: cfip, port: cfport,
+        id: uuid, aid: '0', scy: 'auto', net: 'ws',
+        type: 'none', host: host,
+        path: wsPath + '?ed=2560',
+        tls: security === 'tls' ? 'tls' : '',
+        sni: security === 'tls' ? host : '',
+        alpn: '', fp: 'firefox'
+      };
+      subTxt += `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}\n\n`;
+    } else if (proto === 'trojan') {
+      subTxt += `trojan://${uuid}@${cfip}:${cfport}?security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    }
+  });
+
+  return subTxt;
+}
+
+async function generateStandardSubscription() {
+  // Original behavior - use CFIP directly
+  const domain = currentArgoDomain || ARGO_DOMAIN || '';
+  const inbound = getCurrentInboundClone();
+  const proto = inbound.protocol;
+  const uuid = inbound.settings.clients[0]?.id || UUID;
+  const wsPath = inbound.streamSettings.wsSettings?.path || '/vless-argo';
+  const host = inbound.streamSettings.wsSettings?.headers?.Host || domain;
+  const security = inbound.streamSettings.security || 'none';
+
+  const ISP = await getMetaInfo();
+  const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
+  const encPath = encodeURIComponent(wsPath) + '?ed=2560';
+  const usedIPs = CFIP.length > 0 ? CFIP : [["104.16.0.0", 443]];
+
+  let subTxt = '';
+  usedIPs.forEach((entry) => {
+    const cfip = entry[0];
+    const cfport = entry[1];
+
+    if (proto === 'vless') {
+      subTxt += `vless://${uuid}@${cfip}:${cfport}?encryption=none&security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    } else if (proto === 'vmess') {
+      const vmessObj = {
+        v: '2', ps: nodeName, add: cfip, port: cfport,
+        id: uuid, aid: '0', scy: 'auto', net: 'ws',
+        type: 'none', host: host,
+        path: wsPath + '?ed=2560',
+        tls: security === 'tls' ? 'tls' : '',
+        sni: security === 'tls' ? host : '',
+        alpn: '', fp: 'firefox'
+      };
+      subTxt += `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}\n\n`;
+    } else if (proto === 'trojan') {
+      subTxt += `trojan://${uuid}@${cfip}:${cfport}?security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    }
+  });
+
+  return subTxt;
+}
+
+// ============================================================
+// 9. UTILITY FUNCTIONS (kept from original)
+// ============================================================
+async function getMetaInfo() {
+  try {
+    const response1 = await axios.get('https://api.ip.sb/geoip', { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 3000 });
+    if (response1.data && response1.data.country_code && response1.data.isp) {
+      return `${response1.data.country_code}-${response1.data.isp}`.replace(/\s+/g, '_');
+    }
+  } catch (error) {
+    try {
+      const response2 = await axios.get('http://ip-api.com/json', { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 3000 });
+      if (response2.data && response2.data.status === 'success' && response2.data.countryCode && response2.data.org) {
+        return `${response2.data.countryCode}-${response2.data.org}`.replace(/\s+/g, '_');
+      }
+    } catch (error2) {}
+  }
+  return 'Unknown';
+}
+
 function deleteNodes() {
   try {
     if (!UPLOAD_URL) return;
     if (!fs.existsSync(subPath)) return;
-
     let fileContent;
-    try {
-      fileContent = fs.readFileSync(subPath, 'utf-8');
-    } catch {
-      return null;
-    }
-
+    try { fileContent = fs.readFileSync(subPath, 'utf-8'); } catch { return; }
     const decoded = Buffer.from(fileContent, 'base64').toString('utf-8');
-    const nodes = decoded.split('\n').filter(line => 
-      /(vless|vmess|trojan|hysteria2|tuic):\/\//.test(line)
-    );
-
+    const nodes = decoded.split('\n').filter(line => /(vless|vmess|trojan|hysteria2|tuic):\/\//.test(line));
     if (nodes.length === 0) return;
-
-    axios.post(`${UPLOAD_URL}/api/delete-nodes`, 
-      JSON.stringify({ nodes }),
-      { headers: { 'Content-Type': 'application/json' } }
-    ).catch((error) => { 
-      return null; 
-    });
-    return null;
-  } catch (err) {
-    return null;
-  }
+    axios.post(`${UPLOAD_URL}/api/delete-nodes`, JSON.stringify({ nodes }), { headers: { 'Content-Type': 'application/json' } }).catch(() => {});
+  } catch (err) {}
 }
 
-// 清理历史文件
 function cleanupOldFiles() {
   try {
     const files = fs.readdirSync(FILE_PATH);
@@ -98,136 +638,186 @@ function cleanupOldFiles() {
         if (stat.isFile()) {
           fs.unlinkSync(filePath);
         }
-      } catch (err) {
-        // 忽略所有错误，不记录日志
-      }
+      } catch (err) {}
     });
-  } catch (err) {
-    // 忽略所有错误，不记录日志
+  } catch (err) {}
+}
+
+function argoType() {
+  if (!ARGO_AUTH || !ARGO_DOMAIN) {
+    console.log("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnels");
+    return;
   }
-}
+  if (ARGO_AUTH.includes('TunnelSecret')) {
+    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.json'), ARGO_AUTH);
+    const tunnelYaml = `
+tunnel: ${ARGO_AUTH.split('"')[11]}
+credentials-file: ${path.join(FILE_PATH, 'tunnel.json')}
+protocol: http2
 
-// 生成xr-ay配置文件
-async function generateConfig() {
-  const config = {
-    log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
-    inbounds: [
-      { port: ARGO_PORT, protocol: 'vless', settings: { clients: [{ id: UUID, flow: 'xtls-rprx-vision' }], decryption: 'none', fallbacks: [{ dest: 3001 }, { path: "/vless-argo", dest: 3002 }, { path: "/vmess-argo", dest: 3003 }, { path: "/trojan-argo", dest: 3004 }] }, streamSettings: { network: 'tcp' } },
-      { port: 3001, listen: "127.0.0.1", protocol: "vless", settings: { clients: [{ id: UUID }], decryption: "none" }, streamSettings: { network: "tcp", security: "none" } },
-      { port: 3002, listen: "127.0.0.1", protocol: "vless", settings: { clients: [{ id: UUID, level: 0 }], decryption: "none" }, streamSettings: { network: "ws", security: "none", wsSettings: { path: "/vless-argo" } }, sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } },
-      { port: 3003, listen: "127.0.0.1", protocol: "vmess", settings: { clients: [{ id: UUID, alterId: 0 }] }, streamSettings: { network: "ws", wsSettings: { path: "/vmess-argo" } }, sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } },
-      { port: 3004, listen: "127.0.0.1", protocol: "trojan", settings: { clients: [{ password: UUID }] }, streamSettings: { network: "ws", security: "none", wsSettings: { path: "/trojan-argo" } }, sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } },
-    ],
-    dns: { servers: ["https+local://8.8.8.8/dns-query"] },
-    outbounds: [ { protocol: "freedom", tag: "direct" }, {protocol: "blackhole", tag: "block"} ]
-  };
-  fs.writeFileSync(path.join(FILE_PATH, 'config.json'), JSON.stringify(config, null, 2));
-}
-
-// 判断系统架构
-function getSystemArchitecture() {
-  const arch = os.arch();
-  if (arch === 'arm' || arch === 'arm64' || arch === 'aarch64') {
-    return 'arm';
+ingress:
+  - hostname: ${ARGO_DOMAIN}
+    service: http://localhost:${ARGO_PORT}
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404
+`;
+    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.yml'), tunnelYaml);
   } else {
-    return 'amd';
+    console.log("ARGO_AUTH mismatch TunnelSecret, use token connect to tunnel");
   }
 }
 
-// 下载对应系统架构的依赖文件
-function downloadFile(fileName, fileUrl, callback) {
-  const filePath = fileName; 
-  
-  // 确保目录存在
-  if (!fs.existsSync(FILE_PATH)) {
-    fs.mkdirSync(FILE_PATH, { recursive: true });
+async function extractDomains() {
+  if (ARGO_AUTH && ARGO_DOMAIN) {
+    currentArgoDomain = ARGO_DOMAIN;
+    console.log('ARGO_DOMAIN:', currentArgoDomain);
+    await generateLinks(currentArgoDomain);
+    return;
   }
-  
-  const writer = fs.createWriteStream(filePath);
+  try {
+    if (!fs.existsSync(bootLogPath)) {
+      console.log('boot.log not found, waiting...');
+      await new Promise(r => setTimeout(r, 5000));
+      return await extractDomains();
+    }
+    const fileContent = fs.readFileSync(bootLogPath, 'utf-8');
+    const lines = fileContent.split('\n');
+    for (const line of lines) {
+      const domainMatch = line.match(/https?:\/\/([^ ]*trycloudflare\.com)\/?/);
+      if (domainMatch) {
+        currentArgoDomain = domainMatch[1];
+        console.log('ArgoDomain:', currentArgoDomain);
+        await generateLinks(currentArgoDomain);
+        return;
+      }
+    }
+    // If not found, wait and retry
+    console.log('ArgoDomain not found yet, waiting...');
+    await new Promise(r => setTimeout(r, 3000));
+    return await extractDomains();
+  } catch (error) {
+    console.error('Error reading boot.log:', error);
+    await new Promise(r => setTimeout(r, 3000));
+    return await extractDomains();
+  }
+}
 
-  axios({
-    method: 'get',
-    url: fileUrl,
-    responseType: 'stream',
-  })
-    .then(response => {
-      response.data.pipe(writer);
+async function generateLinks(argoDomain) {
+  const ISP = await getMetaInfo();
+  const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
+  const inbound = getCurrentInboundClone();
+  const uuid = inbound.settings.clients[0]?.id || UUID;
+  const wsPath = inbound.streamSettings.wsSettings?.path || '/vless-argo';
+  const host = inbound.streamSettings.wsSettings?.headers?.Host || argoDomain;
+  const security = inbound.streamSettings.security || 'none';
+  const proto = inbound.protocol;
+  const encPath = encodeURIComponent(wsPath) + '?ed=2560';
+  const usedIPs = CFIP.length > 0 ? CFIP : [["104.16.0.0", 443]];
 
-      writer.on('finish', () => {
-        writer.close();
-        console.log(`Download ${path.basename(filePath)} successfully`);
-        callback(null, filePath);
+  let subTxt = '';
+  usedIPs.forEach((entry) => {
+    const cfip = entry[0];
+    const cfport = entry[1];
+    if (proto === 'vless') {
+      subTxt += `vless://${uuid}@${cfip}:${cfport}?encryption=none&security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    } else if (proto === 'vmess') {
+      const VMESS = { v: '2', ps: nodeName, add: cfip, port: cfport, id: uuid, aid: '0', scy: 'auto', net: 'ws', type: 'none', host: host, path: wsPath + '?ed=2560', tls: security === 'tls' ? 'tls' : '', sni: security === 'tls' ? host : '', alpn: '', fp: 'firefox' };
+      subTxt += `vmess://${Buffer.from(JSON.stringify(VMESS)).toString('base64')}\n\n`;
+    } else if (proto === 'trojan') {
+      subTxt += `trojan://${uuid}@${cfip}:${cfport}?security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    }
+  });
+
+  subTxtCache = subTxt;
+  console.log(Buffer.from(subTxt).toString('base64'));
+  fs.writeFileSync(subPath, Buffer.from(subTxt).toString('base64'));
+  console.log(`${FILE_PATH}/sub.txt saved successfully`);
+  uploadNodes();
+}
+
+async function uploadNodes() {
+  if (UPLOAD_URL && PROJECT_URL) {
+    const subscriptionUrl = `${PROJECT_URL}/${SUB_PATH}`;
+    const jsonData = { subscription: [subscriptionUrl] };
+    try {
+      const response = await axios.post(`${UPLOAD_URL}/api/add-subscriptions`, jsonData, {
+        headers: { 'Content-Type': 'application/json' }
       });
-
-      writer.on('error', err => {
-        fs.unlink(filePath, () => { });
-        const errorMessage = `Download ${path.basename(filePath)} failed: ${err.message}`;
-        console.error(errorMessage); // 下载失败时输出错误消息
-        callback(errorMessage);
+      if (response && response.status === 200) {
+        console.log('Subscription uploaded successfully');
+      }
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        // already exists
+      }
+    }
+  } else if (UPLOAD_URL) {
+    if (!fs.existsSync(listPath)) return;
+    const content = fs.readFileSync(listPath, 'utf-8');
+    const nodes = content.split('\n').filter(line => /(vless|vmess|trojan|hysteria2|tuic):\/\//.test(line));
+    if (nodes.length === 0) return;
+    try {
+      await axios.post(`${UPLOAD_URL}/api/add-nodes`, JSON.stringify({ nodes }), {
+        headers: { 'Content-Type': 'application/json' }
       });
-    })
-    .catch(err => {
-      const errorMessage = `Download ${path.basename(filePath)} failed: ${err.message}`;
-      console.error(errorMessage); // 下载失败时输出错误消息
-      callback(errorMessage);
+      console.log('Nodes uploaded successfully');
+    } catch (error) {}
+  }
+}
+
+async function AddVisitTask() {
+  if (!AUTO_ACCESS || !PROJECT_URL) {
+    console.log("Skipping adding automatic access task");
+    return;
+  }
+  try {
+    const response = await axios.post('https://oooo.serv00.net/add-url', {
+      url: PROJECT_URL
+    }, {
+      headers: { 'Content-Type': 'application/json' }
     });
+    console.log(`automatic access task added successfully`);
+  } catch (error) {
+    console.error(`Add automatic access task failed: ${error.message}`);
+  }
 }
 
-// 下载并运行依赖文件
-async function downloadFilesAndRun() {  
-  
+// ============================================================
+// 10. DOWNLOAD & BOOTSTRAP (kept from original)
+// ============================================================
+async function downloadFilesAndRun() {
   const architecture = getSystemArchitecture();
   const filesToDownload = getFilesForArchitecture(architecture);
-
   if (filesToDownload.length === 0) {
     console.log(`Can't find a file for the current architecture`);
     return;
   }
-
   const downloadPromises = filesToDownload.map(fileInfo => {
     return new Promise((resolve, reject) => {
-      downloadFile(fileInfo.fileName, fileInfo.fileUrl, (err, filePath) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(filePath);
-        }
-      });
+      downloadFile(fileInfo.fileName, fileInfo.fileUrl).then(resolve).catch(reject);
     });
   });
-
   try {
     await Promise.all(downloadPromises);
   } catch (err) {
     console.error('Error downloading files:', err);
     return;
   }
-  // 授权和运行
-  function authorizeFiles(filePaths) {
-    const newPermissions = 0o775;
-    filePaths.forEach(absoluteFilePath => {
-      if (fs.existsSync(absoluteFilePath)) {
-        fs.chmod(absoluteFilePath, newPermissions, (err) => {
-          if (err) {
-            console.error(`Empowerment failed for ${absoluteFilePath}: ${err}`);
-          } else {
-            console.log(`Empowerment success for ${absoluteFilePath}: ${newPermissions.toString(8)}`);
-          }
-        });
-      }
-    });
-  }
+  // Authorize
   const filesToAuthorize = NEZHA_PORT ? [npmPath, webPath, botPath] : [phpPath, webPath, botPath];
-  authorizeFiles(filesToAuthorize);
+  for (const f of filesToAuthorize) {
+    if (fs.existsSync(f)) {
+      try { await ensureFilePermissions(f); } catch(e) {}
+    }
+  }
 
-  //运行ne-zha
+  // Run Nezha
   if (NEZHA_SERVER && NEZHA_KEY) {
     if (!NEZHA_PORT) {
-      // 检测哪吒是否开启TLS
       const port = NEZHA_SERVER.includes(':') ? NEZHA_SERVER.split(':').pop() : '';
       const tlsPorts = new Set(['443', '8443', '2096', '2087', '2083', '2053']);
       const nezhatls = tlsPorts.has(port) ? 'true' : 'false';
-      // 生成 config.yaml
       const configYaml = `
 client_secret: ${NEZHA_KEY}
 debug: false
@@ -248,15 +838,12 @@ tls: ${nezhatls}
 use_gitee_to_upgrade: false
 use_ipv6_country_code: false
 uuid: ${UUID}`;
-      
       fs.writeFileSync(path.join(FILE_PATH, 'config.yaml'), configYaml);
-      
-      // 运行 v1
       const command = `nohup ${phpPath} -c "${FILE_PATH}/config.yaml" >/dev/null 2>&1 &`;
       try {
         await exec(command);
         console.log(`${phpName} is running`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(r => setTimeout(r, 1000));
       } catch (error) {
         console.error(`php running error: ${error}`);
       }
@@ -270,296 +857,64 @@ uuid: ${UUID}`;
       try {
         await exec(command);
         console.log(`${npmName} is running`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(r => setTimeout(r, 1000));
       } catch (error) {
         console.error(`npm running error: ${error}`);
       }
     }
   } else {
-    console.log('NEZHA variable is empty,skip running');
+    console.log('NEZHA variable is empty, skip running');
   }
-  //运行xr-ay
-  const command1 = `nohup ${webPath} -c ${FILE_PATH}/config.json >/dev/null 2>&1 &`;
+
+  // Write initial Xray config
+  await writeXrayConfig();
+
+  // Run Xray
+  const command1 = `nohup ${webPath} -c ${configPath} >/dev/null 2>&1 &`;
   try {
     await exec(command1);
     console.log(`${webName} is running`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(r => setTimeout(r, 1000));
   } catch (error) {
     console.error(`web running error: ${error}`);
   }
 
-  // 运行cloud-fared
+  // Run Argo
   if (fs.existsSync(botPath)) {
     let args;
-
     if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) {
       args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token ${ARGO_AUTH}`;
     } else if (ARGO_AUTH.match(/TunnelSecret/)) {
       args = `tunnel --edge-ip-version auto --config ${FILE_PATH}/tunnel.yml run`;
     } else {
-      args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${FILE_PATH}/boot.log --loglevel info --url http://localhost:${ARGO_PORT}`;
+      args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${bootLogPath} --loglevel info --url http://localhost:${ARGO_PORT}`;
     }
-
     try {
       await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
       console.log(`${botName} is running`);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise(r => setTimeout(r, 2000));
     } catch (error) {
       console.error(`Error executing command: ${error}`);
     }
   }
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
+  await new Promise(r => setTimeout(r, 5000));
 }
 
-//根据系统架构返回对应的url
-function getFilesForArchitecture(architecture) {
-  let baseFiles;
-  if (architecture === 'arm') {
-    baseFiles = [
-      { fileName: webPath, fileUrl: "https://arm64.ssss.nyc.mn/web" },
-      { fileName: botPath, fileUrl: "https://arm64.ssss.nyc.mn/bot" }
-    ];
-  } else {
-    baseFiles = [
-      { fileName: webPath, fileUrl: "https://amd64.ssss.nyc.mn/web" },
-      { fileName: botPath, fileUrl: "https://amd64.ssss.nyc.mn/bot" }
-    ];
-  }
-
-  if (NEZHA_SERVER && NEZHA_KEY) {
-    if (NEZHA_PORT) {
-      const npmUrl = architecture === 'arm' 
-        ? "https://arm64.ssss.nyc.mn/agent"
-        : "https://amd64.ssss.nyc.mn/agent";
-        baseFiles.unshift({ 
-          fileName: npmPath, 
-          fileUrl: npmUrl 
-        });
-    } else {
-      const phpUrl = architecture === 'arm' 
-        ? "https://arm64.ssss.nyc.mn/v1" 
-        : "https://amd64.ssss.nyc.mn/v1";
-      baseFiles.unshift({ 
-        fileName: phpPath, 
-        fileUrl: phpUrl
-      });
-    }
-  }
-
-  return baseFiles;
-}
-
-// 获取固定隧道json
-function argoType() {
-  if (!ARGO_AUTH || !ARGO_DOMAIN) {
-    console.log("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnels");
-    return;
-  }
-
-  if (ARGO_AUTH.includes('TunnelSecret')) {
-    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.json'), ARGO_AUTH);
-    const tunnelYaml = `
-  tunnel: ${ARGO_AUTH.split('"')[11]}
-  credentials-file: ${path.join(FILE_PATH, 'tunnel.json')}
-  protocol: http2
-  
-  ingress:
-    - hostname: ${ARGO_DOMAIN}
-      service: http://localhost:${ARGO_PORT}
-      originRequest:
-        noTLSVerify: true
-    - service: http_status:404
-  `;
-    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.yml'), tunnelYaml);
-  } else {
-    console.log("ARGO_AUTH mismatch TunnelSecret,use token connect to tunnel");
-  }
-}
-
-// 获取临时隧道domain
-async function extractDomains() {
-  let argoDomain;
-
-  if (ARGO_AUTH && ARGO_DOMAIN) {
-    argoDomain = ARGO_DOMAIN;
-    console.log('ARGO_DOMAIN:', argoDomain);
-    await generateLinks(argoDomain);
-  } else {
-    try {
-      const fileContent = fs.readFileSync(path.join(FILE_PATH, 'boot.log'), 'utf-8');
-      const lines = fileContent.split('\n');
-      const argoDomains = [];
-      lines.forEach((line) => {
-        const domainMatch = line.match(/https?:\/\/([^ ]*trycloudflare\.com)\/?/);
-        if (domainMatch) {
-          const domain = domainMatch[1];
-          argoDomains.push(domain);
-        }
-      });
-
-      if (argoDomains.length > 0) {
-        argoDomain = argoDomains[0];
-        console.log('ArgoDomain:', argoDomain);
-        await generateLinks(argoDomain);
-      } else {
-        console.log('ArgoDomain not found, re-running bot to obtain ArgoDomain');
-        // 删除 boot.log 文件，等待 2s 重新运行 server 以获取 ArgoDomain
-        fs.unlinkSync(path.join(FILE_PATH, 'boot.log'));
-        async function killBotProcess() {
-          try {
-            if (process.platform === 'win32') {
-              await exec(`taskkill /f /im ${botName}.exe > nul 2>&1`);
-            } else {
-              await exec(`pkill -f "[${botName.charAt(0)}]${botName.substring(1)}" > /dev/null 2>&1`);
-            }
-          } catch (error) {
-            // 忽略输出
-          }
-        }
-        killBotProcess();
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        const args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${FILE_PATH}/boot.log --loglevel info --url http://localhost:${ARGO_PORT}`;
-        try {
-          await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
-          console.log(`${botName} is running`);
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          await extractDomains(); // 重新提取域名
-        } catch (error) {
-          console.error(`Error executing command: ${error}`);
-        }
-      }
-    } catch (error) {
-      console.error('Error reading boot.log:', error);
-  }
-}
-
-// 获取isp信息
-async function getMetaInfo() {
-  try {
-    const response1 = await axios.get('https://api.ip.sb/geoip', { headers: { 'User-Agent': 'Mozilla/5.0', timeout: 3000 }});
-    if (response1.data && response1.data.country_code && response1.data.isp) {
-      return `${response1.data.country_code}-${response1.data.isp}`.replace(/\s+/g, '_');
-    }
-  } catch (error) {
-      try {
-        // 备用 ip-api.com 获取isp
-        const response2 = await axios.get('http://ip-api.com/json', { headers: { 'User-Agent': 'Mozilla/5.0', timeout: 3000 }});
-        if (response2.data && response2.data.status === 'success' && response2.data.countryCode && response2.data.org) {
-          return `${response2.data.countryCode}-${response2.data.org}`.replace(/\s+/g, '_');
-        }
-      } catch (error) {
-        // console.error('Backup API also failed');
-      }
-  }
-  return 'Unknown';
-}
-// 生成 list 和 sub 信息
-async function generateLinks(argoDomain) {
-  const ISP = await getMetaInfo();
-  const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      let subTxt = '';
-      CFIP.forEach((cfipEntry) => {
-        const cfip = cfipEntry[0];       // 优选ip或域名
-        const cfport = cfipEntry[1];     // 对应端口
-        const VMESS = { v: '2', ps: `${nodeName}`, add: cfip, port: cfport, id: UUID, aid: '0', scy: 'auto', net: 'ws', type: 'none', host: argoDomain, path: '/vmess-argo?ed=2560', tls: 'tls', sni: argoDomain, alpn: '', fp: 'firefox'};
-        subTxt += `
-vless://${UUID}@${cfip}:${cfport}?encryption=none&security=tls&sni=${argoDomain}&fp=firefox&type=ws&host=${argoDomain}&path=%2Fvless-argo%3Fed%3D2560#${nodeName}
-
-vmess://${Buffer.from(JSON.stringify(VMESS)).toString('base64')}
-
-trojan://${UUID}@${cfip}:${cfport}?security=tls&sni=${argoDomain}&fp=firefox&type=ws&host=${argoDomain}&path=%2Ftrojan-argo%3Fed%3D2560#${nodeName}
-`;
-      });
-      // 缓存订阅文本用于API返回
-      subTxtCache = subTxt;
-      // 打印 sub.txt 内容到控制台
-      console.log(Buffer.from(subTxt).toString('base64'));
-      fs.writeFileSync(subPath, Buffer.from(subTxt).toString('base64'));
-      console.log(`${FILE_PATH}/sub.txt saved successfully`);
-      uploadNodes();
-      // 将内容进行 base64 编码并写入 SUB_PATH 路由
-      app.get(`/${SUB_PATH}`, (req, res) => {
-        const encodedContent = Buffer.from(subTxt).toString('base64');
-        res.set('Content-Type', 'text/plain; charset=utf-8');
-        res.send(encodedContent);
-      });
-      resolve(subTxt);
-      }, 2000);
-    });
-  }
-}
-
-// 自动上传节点或订阅
-async function uploadNodes() {
-  if (UPLOAD_URL && PROJECT_URL) {
-    const subscriptionUrl = `${PROJECT_URL}/${SUB_PATH}`;
-    const jsonData = {
-      subscription: [subscriptionUrl]
-    };
-    try {
-        const response = await axios.post(`${UPLOAD_URL}/api/add-subscriptions`, jsonData, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (response && response.status === 200) {
-            console.log('Subscription uploaded successfully');
-            return response;
-        } else {
-          return null;
-          //  console.log('Unknown response status');
-        }
-    } catch (error) {
-        if (error.response) {
-            if (error.response.status === 400) {
-              //  console.error('Subscription already exists');
-            }
-        }
-    }
-  } else if (UPLOAD_URL) {
-      if (!fs.existsSync(listPath)) return;
-      const content = fs.readFileSync(listPath, 'utf-8');
-      const nodes = content.split('\n').filter(line => /(vless|vmess|trojan|hysteria2|tuic):\/\//.test(line));
-
-      if (nodes.length === 0) return;
-
-      const jsonData = JSON.stringify({ nodes });
-
-      try {
-          const response = await axios.post(`${UPLOAD_URL}/api/add-nodes`, jsonData, {
-              headers: { 'Content-Type': 'application/json' }
-          });
-          if (response && response.status === 200) {
-            console.log('Nodes uploaded successfully');
-            return response;
-        } else {
-            return null;
-        }
-      } catch (error) {
-          return null;
-      }
-  } else {
-      // console.log('Skipping upload nodes');
-      return;
-  }
-}
-
-// 90s后删除相关文件
+// ============================================================
+// 11. CLEAN FILES WITH BUG FIX (Module 3)
+// ============================================================
 function cleanFiles() {
   setTimeout(() => {
-    const filesToDelete = [bootLogPath, configPath, webPath, botPath];  
-    
+    // We DO NOT delete configPath and webPath/botPath anymore to support hot restart
+    // Only delete log files and nezha files (but NOT the core binaries)
+    const filesToDelete = [bootLogPath];
+
     if (NEZHA_PORT) {
       filesToDelete.push(npmPath);
     } else if (NEZHA_SERVER && NEZHA_KEY) {
       filesToDelete.push(phpPath);
     }
 
-    // Windows系统使用不同的删除命令
     if (process.platform === 'win32') {
       exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
         console.clear();
@@ -567,59 +922,34 @@ function cleanFiles() {
         console.log('Thank you for using this script, enjoy!');
       });
     } else {
-      exec(`rm -rf ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
+      exec(`rm -f ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
         console.clear();
         console.log('App is running');
         console.log('Thank you for using this script, enjoy!');
       });
     }
-  }, 90000); // 90s
+    
+    // Log the fix status
+    console.log('cleanFiles executed: core binaries preserved for hot restart capability');
+  }, 90000);
 }
-cleanFiles();
 
-// 自动访问项目URL
-async function AddVisitTask() {
-  if (!AUTO_ACCESS || !PROJECT_URL) {
-    console.log("Skipping adding automatic access task");
-    return;
-  }
+// ============================================================
+// 12. EXPRESS ROUTES
+// ============================================================
 
+// ---- Root: Serve Dashboard ----
+app.get("/", async function(req, res) {
   try {
-    const response = await axios.post('https://oooo.serv00.net/add-url', {
-      url: PROJECT_URL
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    // console.log(`${JSON.stringify(response.data)}`);
-    console.log(`automatic access task added successfully`);
-    return response;
-  } catch (error) {
-    console.error(`Add automatic access task faild: ${error.message}`);
-    return null;
+    const filePath = path.join(__dirname, 'index.html');
+    const data = await fs.promises.readFile(filePath, 'utf8');
+    res.send(data);
+  } catch (err) {
+    res.send("Hello world!<br><br>You can access /" + SUB_PATH + " to get your nodes!");
   }
-}
-
-// 主运行逻辑
-async function startserver() {
-  try {
-    argoType();
-    deleteNodes();
-    cleanupOldFiles();
-    await generateConfig();
-    await downloadFilesAndRun();
-    await extractDomains();
-    await AddVisitTask();
-  } catch (error) {
-    console.error('Error in startserver:', error);
-  }
-}
-startserver().catch(error => {
-  console.error('Unhandled error in startserver:', error);
 });
 
-// API: 获取服务器IP
+// ---- Get server IP ----
 app.get("/api/server-ip", async (req, res) => {
   try {
     const response = await axios.get('https://api.ip.sb/geoip', { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 });
@@ -642,25 +972,31 @@ app.get("/api/server-ip", async (req, res) => {
   }
 });
 
-// API: 获取配置信息
+// ---- Get config ----
 app.get("/api/config", (req, res) => {
   res.json({
     port: PORT,
     subPath: SUB_PATH,
     uuid: UUID,
     cfip: CFIP,
-    argoDomain: ARGO_DOMAIN || '',
+    argoDomain: currentArgoDomain || ARGO_DOMAIN || '',
     argoPort: ARGO_PORT,
     nezhaServer: NEZHA_SERVER || '',
     nezhaPort: NEZHA_PORT || '',
     autoAccess: AUTO_ACCESS || false,
     uploadUrl: UPLOAD_URL || '',
     projectUrl: PROJECT_URL || '',
-    name: NAME || ''
+    name: NAME || '',
+    protocol: currentInboundConfig.protocol,
+    network: currentInboundConfig.streamSettings.network,
+    security: currentInboundConfig.streamSettings.security,
+    wsPath: currentInboundConfig.streamSettings.wsSettings.path || '',
+    sniffingEnabled: currentInboundConfig.sniffing.enabled,
+    lastConfigLog: lastConfigLog || ''
   });
 });
 
-// API: 获取节点列表
+// ---- Get nodes ----
 app.get("/api/nodes", (req, res) => {
   try {
     if (subTxtCache) {
@@ -683,15 +1019,299 @@ app.get("/api/nodes", (req, res) => {
   }
 });
 
-// 根路由
-app.get("/", async function(req, res) {
+// ---- Get system status (Module 5) ----
+app.get("/api/system-status", async (req, res) => {
   try {
-    const filePath = path.join(__dirname, 'index.html');
-    const data = await fs.promises.readFile(filePath, 'utf8');
-    res.send(data);
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const memPercent = ((usedMem / totalMem) * 100).toFixed(1);
+    const cpus = os.cpus();
+    const cpuCount = cpus.length;
+    const cpuModel = cpus.length > 0 ? cpus[0].model : 'unknown';
+    
+    // Simple CPU load average (not available on Windows but we try)
+    let loadAvg = [0, 0, 0];
+    try {
+      loadAvg = os.loadavg();
+    } catch(e) {}
+
+    // Check if xray and argo processes are running
+    let webRunning = false;
+    let botRunning = false;
+    try {
+      if (process.platform === 'win32') {
+        const { stdout } = await exec(`tasklist /fi "IMAGENAME eq ${webName}.exe" 2>nul`);
+        webRunning = stdout.includes(webName);
+        const { stdout: botOut } = await exec(`tasklist /fi "IMAGENAME eq ${botName}.exe" 2>nul`);
+        botRunning = botOut.includes(botName);
+      } else {
+        const { stdout } = await exec(`pgrep -f "${webName}" 2>/dev/null || echo ""`);
+        webRunning = stdout.trim().length > 0;
+        const { stdout: botOut } = await exec(`pgrep -f "${botName}" 2>/dev/null || echo ""`);
+        botRunning = botOut.trim().length > 0;
+      }
+    } catch(e) {}
+
+    res.json({
+      memory: {
+        total: (totalMem / 1024 / 1024).toFixed(0),
+        used: (usedMem / 1024 / 1024).toFixed(0),
+        free: (freeMem / 1024 / 1024).toFixed(0),
+        percent: memPercent
+      },
+      cpu: {
+        count: cpuCount,
+        model: cpuModel,
+        loadAvg: loadAvg
+      },
+      processes: {
+        xray: webRunning,
+        argo: botRunning,
+        xrayName: webName,
+        botName: botName
+      },
+      argoDomain: currentArgoDomain || ARGO_DOMAIN || '',
+      uptime: os.uptime(),
+      platform: os.platform(),
+      arch: os.arch(),
+      hostname: os.hostname(),
+      lastConfigLog: lastConfigLog || ''
+    });
   } catch (err) {
-    res.send("Hello world!<br><br>You can access /{SUB_PATH}(Default: /sub) to get your nodes!");
+    res.json({ error: err.message });
   }
 });
 
-app.listen(PORT, () => console.log(`http server is running on port:${PORT}!`));
+// ---- Get current inbound config (Module 1) ----
+app.get("/api/inbound-config", (req, res) => {
+  try {
+    const cfg = getCurrentInboundClone();
+    res.json({
+      protocol: cfg.protocol,
+      port: cfg.port,
+      settings: {
+        clients: cfg.settings.clients.map(c => ({
+          id: c.id,
+          flow: c.flow || ''
+        })),
+        decryption: cfg.settings.decryption
+      },
+      streamSettings: {
+        network: cfg.streamSettings.network,
+        security: cfg.streamSettings.security,
+        wsSettings: {
+          path: cfg.streamSettings.wsSettings.path,
+          headers: {
+            Host: cfg.streamSettings.wsSettings.headers.Host
+          }
+        },
+        grpcSettings: {
+          serviceName: cfg.streamSettings.grpcSettings.serviceName
+        },
+        tlsSettings: {
+          serverName: cfg.streamSettings.tlsSettings.serverName,
+          alpn: cfg.streamSettings.tlsSettings.alpn,
+          minVersion: cfg.streamSettings.tlsSettings.minVersion
+        }
+      },
+      sniffing: {
+        enabled: cfg.sniffing.enabled,
+        destOverride: cfg.sniffing.destOverride,
+        metadataOnly: cfg.sniffing.metadataOnly
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- POST: Update inbound config & hot restart (Modules 1 & 2) ----
+app.post("/api/update-inbound", async (req, res) => {
+  try {
+    const body = req.body;
+    
+    // Validate required fields
+    if (!body.protocol || !['vless', 'vmess', 'trojan'].includes(body.protocol)) {
+      return res.status(400).json({ error: 'Invalid or missing protocol. Must be vless, vmess, or trojan.' });
+    }
+
+    // Update currentInboundConfig
+    const newCfg = getCurrentInboundClone();
+    newCfg.protocol = body.protocol;
+    
+    // Update clients
+    if (body.settings && body.settings.clients && body.settings.clients.length > 0) {
+      const client = body.settings.clients[0];
+      newCfg.settings.clients[0].id = client.id || UUID;
+      newCfg.settings.clients[0].flow = client.flow || '';
+    }
+
+    // Update streamSettings
+    if (body.streamSettings) {
+      newCfg.streamSettings.network = body.streamSettings.network || 'ws';
+      newCfg.streamSettings.security = body.streamSettings.security || 'none';
+      
+      if (body.streamSettings.wsSettings) {
+        newCfg.streamSettings.wsSettings.path = body.streamSettings.wsSettings.path || '/vless-argo';
+        if (body.streamSettings.wsSettings.headers) {
+          newCfg.streamSettings.wsSettings.headers.Host = body.streamSettings.wsSettings.headers.Host || '';
+        }
+      }
+      
+      if (body.streamSettings.grpcSettings) {
+        newCfg.streamSettings.grpcSettings.serviceName = body.streamSettings.grpcSettings.serviceName || '';
+      }
+      
+      if (body.streamSettings.tlsSettings) {
+        newCfg.streamSettings.tlsSettings.serverName = body.streamSettings.tlsSettings.serverName || '';
+        newCfg.streamSettings.tlsSettings.alpn = body.streamSettings.tlsSettings.alpn || ['h2', 'http/1.1'];
+        newCfg.streamSettings.tlsSettings.minVersion = body.streamSettings.tlsSettings.minVersion || '1.2';
+      }
+    }
+
+    // Update sniffing
+    if (body.sniffing) {
+      newCfg.sniffing.enabled = body.sniffing.enabled === true || body.sniffing.enabled === 'true';
+      newCfg.sniffing.destOverride = body.sniffing.destOverride || ['http', 'tls', 'quic'];
+      newCfg.sniffing.metadataOnly = body.sniffing.metadataOnly === true || body.sniffing.metadataOnly === 'true';
+    }
+
+    // Apply the config to memory
+    Object.assign(currentInboundConfig, newCfg);
+    
+    // Respond immediately that config is accepted
+    res.json({ 
+      success: true, 
+      message: 'Configuration accepted. Hot restart initiated...',
+      config: getCurrentInboundClone()
+    });
+
+    // --- Async hot restart (non-blocking) ---
+    setImmediate(async () => {
+      try {
+        // Ensure binary exists before restart (Module 3 bug fix)
+        const arch = getSystemArchitecture();
+        const binaryOk = await ensureBinaryExists(webPath, arch, 'web');
+        if (!binaryOk) {
+          console.error('CRITICAL: Xray binary could not be ensured after hot restart attempt');
+          return;
+        }
+
+        // Hot restart Xray
+        await hotRestartXray();
+        
+        // Regenerate subscription links with new config
+        if (currentArgoDomain) {
+          await generateLinks(currentArgoDomain);
+        }
+        
+        console.log('Hot restart completed successfully with new config');
+      } catch (err) {
+        console.error('Hot restart failed:', err.message);
+      }
+    });
+    
+  } catch (err) {
+    console.error('Error in /api/update-inbound:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// ---- POST: Restart Argo tunnel (Module 3) ----
+app.post("/api/restart-argo", async (req, res) => {
+  try {
+    res.json({ success: true, message: 'Argo restart initiated...' });
+    
+    setImmediate(async () => {
+      try {
+        await hotRestartArgo();
+        // Re-extract domain if temporary tunnel
+        if (!ARGO_DOMAIN) {
+          await extractDomains();
+        }
+      } catch (err) {
+        console.error('Argo restart failed:', err.message);
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Dynamic GeoIP-Optimized Subscription (Module 4) ----
+app.get(`/${SUB_PATH}`, async (req, res) => {
+  try {
+    // Get user's real IP
+    const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection.remoteAddress || '';
+    
+    // [BUG FIX 3]: Check Cloudflare cf-ipcountry header first (highest priority, zero latency).
+    // Railway behind proxy often exposes this header directly.
+    const cfCountry = (req.headers['cf-ipcountry'] || '').toUpperCase();
+    let countryCode = '';
+    if (cfCountry && cfCountry.length === 2 && CF_OPTIMAL_IPS[cfCountry]) {
+      countryCode = cfCountry;
+    } else {
+      // Fallback: external geo API lookup
+      const geoInfo = await getUserGeoInfo(userIp);
+      countryCode = geoInfo.country || '';
+    }
+    
+    // Ultimate fallback: if countryCode is still empty or unrecognized, use 'default'
+    if (!countryCode || !CF_OPTIMAL_IPS[countryCode]) {
+      countryCode = 'default';
+    }
+    
+    // Generate optimized subscription
+    let subTxt;
+    if (countryCode && CF_OPTIMAL_IPS[countryCode]) {
+      // Geo-optimized for specific country
+      subTxt = await generateOptimizedSubscription(userIp, countryCode);
+    } else {
+      // Fall back to standard subscription
+      subTxt = await generateStandardSubscription();
+    }
+    
+    const encodedContent = Buffer.from(subTxt).toString('base64');
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    res.set('X-Geo-Country', countryCode || 'unknown');
+    res.set('X-Node-Protocol', currentInboundConfig.protocol);
+    res.send(encodedContent);
+  } catch (err) {
+    console.error('Subscription generation error:', err);
+    // Fallback to original subscription
+    try {
+      const sub = await generateStandardSubscription();
+      const encodedContent = Buffer.from(sub).toString('base64');
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.send(encodedContent);
+    } catch (err2) {
+      res.status(500).send('Subscription generation failed');
+    }
+  }
+});
+
+// ============================================================
+// 13. MAIN STARTUP
+// ============================================================
+async function startserver() {
+  try {
+    argoType();
+    deleteNodes();
+    cleanupOldFiles();
+    await downloadFilesAndRun();
+    await extractDomains();
+    await AddVisitTask();
+    cleanFiles(); // 90s cleanup (MODIFIED: preserves core binaries)
+  } catch (error) {
+    console.error('Error in startserver:', error);
+  }
+}
+
+startserver().catch(error => {
+  console.error('Unhandled error in startserver:', error);
+});
+
+app.listen(PORT, () => console.log(`HTTP server is running on port:${PORT}!`));

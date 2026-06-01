@@ -4,6 +4,7 @@ const axios = require("axios");
 const os = require('os');
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
 const spawn = require('child_process').spawn;
@@ -33,8 +34,155 @@ const NAME = process.env.NAME || '';
 app.use(express.json({ limit: '1mb' }));
 app.set('trust proxy', true); // For correct req.ip behind proxies
 
+// [BUG FIX 3]: In-memory GeoIP cache to prevent subscription 500 errors on API timeout.
+const geoCache = {};
+
 // ============================================================
-// 2. FILE & PROCESS GLOBALS
+// 2. DYNAMIC CIDR CLOUDFLARE IP GENERATOR & TCP CONCURRENT LATENCY TESTER
+// ============================================================
+
+// Cloudflare official IPv4 CIDR ranges (publicly documented)
+const CF_CIDR_RANGES = [
+  { base: "104.16.0.0", mask: 12 },
+  { base: "104.24.0.0", mask: 14 },
+  { base: "172.64.0.0", mask: 13 },
+  { base: "173.245.48.0", mask: 20 },
+  { base: "103.21.244.0", mask: 22 },
+  { base: "103.22.200.0", mask: 22 },
+  { base: "103.31.4.0", mask: 22 },
+  { base: "141.101.64.0", mask: 18 },
+  { base: "108.162.192.0", mask: 18 },
+  { base: "190.93.240.0", mask: 20 },
+  { base: "188.114.96.0", mask: 20 },
+  { base: "197.234.240.0", mask: 22 },
+  { base: "198.41.128.0", mask: 17 },
+  { base: "162.158.0.0", mask: 15 },
+  { base: "104.20.0.0", mask: 16 }
+];
+
+// Helper: convert dotted IPv4 to 32-bit integer
+function ipToInt(ip) {
+  const parts = ip.split('.').map(Number);
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+}
+
+// Helper: convert 32-bit integer back to dotted IPv4
+function intToIp(intVal) {
+  return [
+    (intVal >>> 24) & 0xFF,
+    (intVal >>> 16) & 0xFF,
+    (intVal >>> 8) & 0xFF,
+    intVal & 0xFF
+  ].join('.');
+}
+
+// Generate <count> random unique Cloudflare edge IPs from CIDR ranges
+function generateRandomCloudflareIPs(count = 20) {
+  const ips = new Set();
+  let attempts = 0;
+  const maxAttempts = count * 30; // safety valve
+
+  while (ips.size < count && attempts < maxAttempts) {
+    attempts++;
+    // Pick a random CIDR range
+    const range = CF_CIDR_RANGES[Math.floor(Math.random() * CF_CIDR_RANGES.length)];
+    const baseInt = ipToInt(range.base);
+    const hostBits = 32 - range.mask;
+    const rangeSize = Math.pow(2, hostBits);
+    // Skip network address (.0) and broadcast address (.255 equivalent)
+    const offset = 1 + Math.floor(Math.random() * (rangeSize - 2));
+    const candidateInt = baseInt + offset;
+    const candidateIp = intToIp(candidateInt);
+    // [OPTIMIZATION]: Validate all 4 octets — reject .0/.255 at ANY position (not just last).
+    // CF edge nodes never end in .0 or .255, and certain internal-use prefixes are avoided.
+    const octets = candidateIp.split('.').map(Number);
+    const lastOctet = octets[3];
+    // Skip if any octet is 0 or 255 — these are reserved/broadcast ranges
+    if (octets[0] === 0 || octets[0] === 255) continue;
+    if (octets[1] === 0 || octets[1] === 255) continue;
+    if (octets[2] === 0 || octets[2] === 255) continue;
+    if (octets[3] === 0 || octets[3] === 255) continue;
+    // skip 10.x.x.x (RFC1918 private), 127.x.x.x (loopback), 169.254.x.x (link-local)
+    if (octets[0] === 10) continue;
+    if (octets[0] === 127) continue;
+    if (octets[0] === 169 && octets[1] === 254) continue;
+    ips.add(candidateIp);
+  }
+
+  return Array.from(ips).map(ip => [ip, 443]);
+}
+
+// Concurrently TCP-probe a list of [ip, port] pairs, return top 3 by latency
+async function testOptimalIPs(ipList) {
+  const CONCURRENCY_LIMIT = 20;
+  const TIMEOUT_MS = 1500;
+  const FALLBACK_IPS = [["104.16.0.0", 443], ["172.64.0.0", 443], ["104.18.0.0", 443]];
+
+  if (!ipList || ipList.length === 0) {
+    return FALLBACK_IPS;
+  }
+
+  // Single IP probe via raw TCP connect
+  function probeSingleIP(entry) {
+    return new Promise((resolve) => {
+      const ip = entry[0];
+      const port = entry[1] || 443;
+      const startTime = Date.now();
+      const socket = new net.Socket();
+      
+      socket.setTimeout(TIMEOUT_MS);
+      
+      socket.on('connect', () => {
+        const latency = Date.now() - startTime;
+        socket.destroy();
+        resolve({ ip, port, latency, success: true });
+      });
+
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve({ ip, port, latency: -1, success: false });
+      });
+
+      socket.on('error', () => {
+        socket.destroy();
+        resolve({ ip, port, latency: -1, success: false });
+      });
+
+      socket.connect(port, ip);
+    });
+  }
+
+  // Run all probes concurrently with a limit
+  const results = [];
+  const chunks = [];
+  for (let i = 0; i < ipList.length; i += CONCURRENCY_LIMIT) {
+    chunks.push(ipList.slice(i, i + CONCURRENCY_LIMIT));
+  }
+
+  for (const chunk of chunks) {
+    const chunkResults = await Promise.all(chunk.map(entry => probeSingleIP(entry)));
+    results.push(...chunkResults);
+  }
+
+  // Filter successful probes, sort by latency ascending
+  const successful = results
+    .filter(r => r.success && r.latency >= 0)
+    .sort((a, b) => a.latency - b.latency);
+
+  if (successful.length === 0) {
+    console.log('All TCP probes timed out, using fallback IPs');
+    return FALLBACK_IPS;
+  }
+
+  // Take top 3 fastest
+  const top3 = successful.slice(0, 3);
+  console.log(`TCP latency test: ${successful.length}/${ipList.length} alive, top3=${top3.map(r => r.ip + ':' + r.latency + 'ms').join(', ')}`);
+  
+  return top3.map(r => [r.ip, r.port]);
+}
+
+// ============================================================
+// 3. FILE & PROCESS GLOBALS
 // ============================================================
 function generateRandomName() {
   const characters = 'abcdefghijklmnopqrstuvwxyz';
@@ -336,35 +484,41 @@ function buildXrayConfig() {
     mainInbound.settings.clients.forEach(c => { delete c.flow; delete c.id; });
   }
 
-  // [BUG FIX 2]: Use dynamic UUID from currentInboundConfig, not the static global UUID.
-  // This ensures main inbound and internal fallback ports use the SAME credential.
-  const dynamicId = cfg.settings.clients[0]?.id || UUID;
+  // [BUG FIX 1]: Unified activeUUID — ensures main + all 4 internal fallback ports
+  // use the exact SAME credential from the frontend config, never out of sync.
+  const activeUUID = currentInboundConfig.settings.clients[0].id || UUID;
+
+  // [BUG FIX 2]: Trojan protocol must ONLY have password field. No decryption, no id, no flow.
+  if (cfg.protocol === 'trojan') {
+    mainInbound.settings.clients = [{ password: activeUUID, level: 0 }];
+    delete mainInbound.settings.decryption;
+  }
 
   const internalInbounds = [
     {
       port: 3001, listen: "127.0.0.1",
       protocol: "vless",
-      settings: { clients: [{ id: dynamicId }], decryption: "none" },
+      settings: { clients: [{ id: activeUUID }], decryption: "none" },
       streamSettings: { network: "tcp", security: "none" }
     },
     {
       port: 3002, listen: "127.0.0.1",
       protocol: "vless",
-      settings: { clients: [{ id: dynamicId, level: 0 }], decryption: "none" },
+      settings: { clients: [{ id: activeUUID, level: 0 }], decryption: "none" },
       streamSettings: { network: "ws", security: "none", wsSettings: { path: "/vless-argo" } },
       sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
     },
     {
       port: 3003, listen: "127.0.0.1",
       protocol: "vmess",
-      settings: { clients: [{ id: dynamicId, alterId: 0 }] },
+      settings: { clients: [{ id: activeUUID, alterId: 0 }] },
       streamSettings: { network: "ws", wsSettings: { path: "/vmess-argo" } },
       sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
     },
     {
       port: 3004, listen: "127.0.0.1",
       protocol: "trojan",
-      settings: { clients: [{ password: dynamicId }] },
+      settings: { clients: [{ password: activeUUID }] },
       streamSettings: { network: "ws", security: "none", wsSettings: { path: "/trojan-argo" } },
       sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false }
     }
@@ -509,13 +663,10 @@ async function hotRestartArgo() {
 // ============================================================
 // 8. SUBSCRIPTION LINK GENERATION (with Geo-IP optimization)
 // ============================================================
-async function generateOptimizedSubscription(userIp, countryCode) {
-  const geoInfo = countryCode 
-    ? { country: countryCode } 
-    : await getUserGeoInfo(userIp);
-  
-  const cc = geoInfo.country || '';
-  const optimalIPs = getOptimalIPs(cc);
+// [REFACTORED] Accepts a pre-probed dynamic IP list, country code, and ISP label.
+// This is called by the TCP-probed subscription route — never calls getOptimalIPs().
+async function generateOptimizedSubscription(probedIPs, countryCode, ispLabel) {
+  const cc = countryCode || '';
   const domain = currentArgoDomain || ARGO_DOMAIN || '';
   const inbound = getCurrentInboundClone();
   const proto = inbound.protocol;
@@ -523,10 +674,10 @@ async function generateOptimizedSubscription(userIp, countryCode) {
   const wsPath = inbound.streamSettings.wsSettings?.path || '/vless-argo';
   const host = inbound.streamSettings.wsSettings?.headers?.Host || domain;
   const security = inbound.streamSettings.security || 'none';
-  const nodeName = NAME || `Node-${cc || 'Global'}`;
+  const nodeName = NAME ? `${NAME}-${ispLabel || cc || 'Global'}` : (ispLabel || cc || 'Global');
 
   let subTxt = '';
-  const usedIPs = optimalIPs.length > 0 ? optimalIPs : CFIP;
+  const usedIPs = (probedIPs && probedIPs.length > 0) ? probedIPs : CFIP;
 
   usedIPs.forEach((entry) => {
     const cfip = entry[0];
@@ -555,7 +706,7 @@ async function generateOptimizedSubscription(userIp, countryCode) {
 }
 
 async function generateStandardSubscription() {
-  // Original behavior - use CFIP directly
+  // Original behavior - use CFIP directly (already parsed from env or defaults at top of file)
   const domain = currentArgoDomain || ARGO_DOMAIN || '';
   const inbound = getCurrentInboundClone();
   const proto = inbound.protocol;
@@ -567,7 +718,7 @@ async function generateStandardSubscription() {
   const ISP = await getMetaInfo();
   const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
   const encPath = encodeURIComponent(wsPath) + '?ed=2560';
-  const usedIPs = CFIP.length > 0 ? CFIP : [["104.16.0.0", 443]];
+  const usedIPs = CFIP;
 
   let subTxt = '';
   usedIPs.forEach((entry) => {
@@ -907,30 +1058,48 @@ function cleanFiles() {
   setTimeout(() => {
     // We DO NOT delete configPath and webPath/botPath anymore to support hot restart
     // Only delete log files and nezha files (but NOT the core binaries)
-    const filesToDelete = [bootLogPath];
+    
+    // [OPTIMIZATION]: Use fs.truncateSync for bootLogPath instead of deleting it.
+    // This clears the file content but preserves the file handle — Argo tunnel can
+    // continue writing to boot.log without getting an ENOENT error.
+    try {
+      if (fs.existsSync(bootLogPath)) {
+        fs.truncateSync(bootLogPath, 0);
+        console.log('boot.log truncated successfully (file handle preserved)');
+      }
+    } catch (err) {
+      console.error('Failed to truncate boot.log:', err.message);
+    }
 
+    const filesToDelete = [];
     if (NEZHA_PORT) {
       filesToDelete.push(npmPath);
     } else if (NEZHA_SERVER && NEZHA_KEY) {
       filesToDelete.push(phpPath);
     }
 
-    if (process.platform === 'win32') {
-      exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
-        console.clear();
-        console.log('App is running');
-        console.log('Thank you for using this script, enjoy!');
-      });
+    if (filesToDelete.length > 0) {
+      if (process.platform === 'win32') {
+        exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
+          console.clear();
+          console.log('App is running');
+          console.log('Thank you for using this script, enjoy!');
+        });
+      } else {
+        exec(`rm -f ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
+          console.clear();
+          console.log('App is running');
+          console.log('Thank you for using this script, enjoy!');
+        });
+      }
     } else {
-      exec(`rm -f ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
-        console.clear();
-        console.log('App is running');
-        console.log('Thank you for using this script, enjoy!');
-      });
+      console.clear();
+      console.log('App is running');
+      console.log('Thank you for using this script, enjoy!');
     }
     
     // Log the fix status
-    console.log('cleanFiles executed: core binaries preserved for hot restart capability');
+    console.log('cleanFiles executed: boot.log truncated, core binaries preserved for hot restart');
   }, 90000);
 }
 
@@ -1241,49 +1410,95 @@ app.post("/api/restart-argo", async (req, res) => {
   }
 });
 
-// ---- Dynamic GeoIP-Optimized Subscription (Module 4) ----
+// ---- Generate subscription with a specific IP list (dynamic TCP-probed or fallback) ----
+async function generateSubscriptionWithIPs(ipList) {
+  const domain = currentArgoDomain || ARGO_DOMAIN || '';
+  const inbound = getCurrentInboundClone();
+  const proto = inbound.protocol;
+  const uuid = inbound.settings.clients[0]?.id || UUID;
+  const wsPath = inbound.streamSettings.wsSettings?.path || '/vless-argo';
+  const host = inbound.streamSettings.wsSettings?.headers?.Host || domain;
+  const security = inbound.streamSettings.security || 'none';
+  const ISP = await getMetaInfo();
+  const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
+  const encPath = encodeURIComponent(wsPath) + '?ed=2560';
+
+  let subTxt = '';
+  const usedIPs = (ipList && ipList.length > 0) ? ipList : [["104.16.0.0", 443]];
+
+  usedIPs.forEach((entry) => {
+    const cfip = entry[0];
+    const cfport = entry[1];
+
+    if (proto === 'vless') {
+      subTxt += `vless://${uuid}@${cfip}:${cfport}?encryption=none&security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    } else if (proto === 'vmess') {
+      const vmessObj = {
+        v: '2', ps: nodeName, add: cfip, port: cfport,
+        id: uuid, aid: '0', scy: 'auto', net: 'ws',
+        type: 'none', host: host,
+        path: wsPath + '?ed=2560',
+        tls: security === 'tls' ? 'tls' : '',
+        sni: security === 'tls' ? host : '',
+        alpn: '', fp: 'firefox'
+      };
+      subTxt += `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}\n\n`;
+    } else if (proto === 'trojan') {
+      subTxt += `trojan://${uuid}@${cfip}:${cfport}?security=${security}${security === 'tls' ? `&sni=${host}` : ''}&fp=firefox&type=ws&host=${host}&path=${encPath}#${nodeName}\n\n`;
+    }
+  });
+
+  return subTxt;
+}
+
+// ---- Dynamic TCP-Probed Optimal IP Subscription (Module 4 upgraded) ----
 app.get(`/${SUB_PATH}`, async (req, res) => {
   try {
     // Get user's real IP
     const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection.remoteAddress || '';
     
-    // [BUG FIX 3]: Check Cloudflare cf-ipcountry header first (highest priority, zero latency).
-    // Railway behind proxy often exposes this header directly.
-    const cfCountry = (req.headers['cf-ipcountry'] || '').toUpperCase();
-    let countryCode = '';
-    if (cfCountry && cfCountry.length === 2 && CF_OPTIMAL_IPS[cfCountry]) {
-      countryCode = cfCountry;
-    } else {
-      // Fallback: external geo API lookup
-      const geoInfo = await getUserGeoInfo(userIp);
-      countryCode = geoInfo.country || '';
+    // [BUG FIX 3]: In-memory geoCache lookup — avoids repeated API calls and prevents 500 on timeout.
+    let countryCode = geoCache[userIp] || '';
+    
+    if (!countryCode) {
+      // Check Cloudflare cf-ipcountry header first (highest priority, zero latency).
+      const cfCountry = (req.headers['cf-ipcountry'] || '').toUpperCase();
+      if (cfCountry && cfCountry.length === 2 && CF_OPTIMAL_IPS[cfCountry]) {
+        countryCode = cfCountry;
+      } else {
+        // Fallback: external geo API lookup
+        const geoInfo = await getUserGeoInfo(userIp);
+        countryCode = geoInfo.country || '';
+      }
+      // Write to cache for next time
+      geoCache[userIp] = countryCode;
     }
     
     // Ultimate fallback: if countryCode is still empty or unrecognized, use 'default'
-    if (!countryCode || !CF_OPTIMAL_IPS[countryCode]) {
-      countryCode = 'default';
-    }
+    countryCode = countryCode || 'default';
     
-    // Generate optimized subscription
-    let subTxt;
-    if (countryCode && CF_OPTIMAL_IPS[countryCode]) {
-      // Geo-optimized for specific country
-      subTxt = await generateOptimizedSubscription(userIp, countryCode);
-    } else {
-      // Fall back to standard subscription
-      subTxt = await generateStandardSubscription();
-    }
+    // [DYNAMIC PROBE]: Generate 20 random Cloudflare IPs from official CIDR ranges
+    const randomIPs = generateRandomCloudflareIPs(20);
+    console.log(`Subscription request from ${userIp} (${countryCode}): probing ${randomIPs.length} random CF IPs...`);
+
+    // [DYNAMIC PROBE]: Concurrent TCP latency test on port 443, pick top 3 fastest
+    const optimalIPs = await testOptimalIPs(randomIPs);
+    console.log(`Optimal CF IPs for ${userIp}: ${optimalIPs.map(e => e[0] + ':' + e[1]).join(', ')}`);
+
+    // Generate subscription with the dynamically probed optimal IPs
+    const subTxt = await generateSubscriptionWithIPs(optimalIPs);
     
     const encodedContent = Buffer.from(subTxt).toString('base64');
     res.set('Content-Type', 'text/plain; charset=utf-8');
     res.set('X-Geo-Country', countryCode || 'unknown');
     res.set('X-Node-Protocol', currentInboundConfig.protocol);
+    res.set('X-Probed-IPs', optimalIPs.length.toString());
     res.send(encodedContent);
   } catch (err) {
     console.error('Subscription generation error:', err);
-    // Fallback to original subscription
+    // Fallback to original subscription with CFIP env list
     try {
-      const sub = await generateStandardSubscription();
+      const sub = await generateSubscriptionWithIPs(CFIP);
       const encodedContent = Buffer.from(sub).toString('base64');
       res.set('Content-Type', 'text/plain; charset=utf-8');
       res.send(encodedContent);

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node-Argo 控制面板</title>
+<style>
+  :root {
+    --bg-primary: #0f1117;
+    --bg-secondary: #1a1d2e;
+    --bg-card: #21253a;
+    --bg-hover: #2a2f47;
+    --text-primary: #e4e6f0;
+    --text-secondary: #8b8fa3;
+    --accent: #6c5ce7;
+    --accent-light: #a29bfe;
+    --success: #00b894;
+    --warning: #fdcb6e;
+    --danger: #e17055;
+    --border: #2d3250;
+    --gradient-1: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    --gradient-2: linear-gradient(135deg, #00b894, #55efc4);
+    --gradient-3: linear-gradient(135deg, #e17055, #fab1a0);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 40px 0 30px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+  .header h1 {
+    font-size: 2.2em;
+    background: var(--gradient-1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .header p { color: var(--text-secondary); font-size: 0.95em; }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .stat-card .label { color: var(--text-secondary); font-size: 0.85em; margin-bottom: 6px; }
+  .stat-card .value { font-size: 1.5em; font-weight: 700; }
+  .stat-card .value.accent { color: var(--accent-light); }
+  .stat-card .value.success { color: var(--success); }
+  .stat-card .value.warning { color: var(--warning); }
+
+  /* Section */
+  .section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+  }
+  .section-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+  }
+
+  /* Subscription URL */
+  .sub-url-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .sub-url-box code {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--accent-light);
+    word-break: break-all;
+    min-width: 200px;
+  }
+  .btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--gradient-1); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-success { background: var(--gradient-2); color: #fff; }
+  .btn-success:hover { opacity: 0.9; }
+  .btn-sm { padding: 5px 12px; font-size: 0.8em; }
+
+  /* QR Code */
+  .qr-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    margin: 16px auto;
+    width: fit-content;
+  }
+  #qrcode { display: block; }
+
+  /* Config Table */
+  .config-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .config-table tr { border-bottom: 1px solid var(--border); }
+  .config-table tr:last-child { border-bottom: none; }
+  .config-table td {
+    padding: 12px 8px;
+    vertical-align: middle;
+  }
+  .config-table td:first-child {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    width: 160px;
+    white-space: nowrap;
+  }
+  .config-table td:last-child {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    word-break: break-all;
+  }
+
+  /* IP Table */
+  .ip-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .ip-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    font-weight: 600;
+    border-radius: 6px;
+  }
+  .ip-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+  }
+  .ip-table tr:hover td { background: var(--bg-hover); }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    font-family: -apple-system, sans-serif;
+  }
+  .badge-accent { background: rgba(108,92,231,0.2); color: var(--accent-light); }
+  .badge-success { background: rgba(0,184,148,0.2); color: var(--success); }
+
+  /* Node List */
+  .node-list { list-style: none; }
+  .node-item {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    transition: border-color 0.2s;
+  }
+  .node-item:hover { border-color: var(--accent); }
+  .node-info {
+    flex: 1;
+    min-width: 200px;
+    overflow: hidden;
+  }
+  .node-type {
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 2px;
+  }
+  .node-detail {
+    font-family: 'Courier New', monospace;
+    font-size: 0.78em;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .node-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--bg-primary);
+    border-radius: 10px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    white-space: nowrap;
+    border: none;
+    background: none;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    z-index: 9999;
+    transition: transform 0.3s ease;
+    box-shadow: 0 8px 30px rgba(108,92,231,0.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 30px 0;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+  }
+
+  /* Latency Test */
+  .check-btn {
+    padding: 10px 24px;
+    background: var(--gradient-1);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .check-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .check-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .check-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .check-time { color: var(--text-secondary); font-size: 0.85em; }
+  .latency-good { color: var(--success); font-weight: 700; }
+  .latency-medium { color: var(--warning); font-weight: 700; }
+  .latency-bad { color: var(--danger); font-weight: 700; }
+  .latency-timeout { color: var(--text-secondary); font-weight: 700; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .container { padding: 12px; }
+    .header h1 { font-size: 1.6em; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card { padding: 14px; }
+    .stat-card .value { font-size: 1.2em; }
+    .sub-url-box { flex-direction: column; align-items: stretch; }
+    .node-item { flex-direction: column; align-items: stretch; }
+    .node-actions { justify-content: flex-end; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>⚡ Node-Argo 控制面板</h1>
+    <p>Cloudflare 隧道代理节点管理</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+      <div class="label">订阅端口</div>
+      <div class="value accent" id="statPort">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">CFIP 数量</div>
+      <div class="value success" id="statCFIP">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">节点总数</div>
+      <div class="value warning" id="statNodes">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">服务器 IP</div>
+      <div class="value accent" id="statIP">加载中...</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">隧道类型</div>
+      <div class="value accent" id="statTunnel">-</div>
+    </div>
+  </div>
+
+  <!-- Subscription Section -->
+  <div class="section">
+    <div class="section-title">
+      <div class="icon" style="background:rgba(108,92,231,0.2)">🔗</div>
+      订阅链接
+    </div>
+    <div class="sub-url-box">
+      <code id="subUrl">加载中...</code>
+      <button class="btn btn-primary" onclick="copyText(document.getElementById('subUrl').textContent)">📋 复制</button>
+    </div>
+    <div style="text-align:center; margin-top:12px;">
+      <button class="btn btn-success" onclick="showQRCode()">📱 显示二维码</button>
+      <button class="btn btn-sm" style="background:var(--bg-hover);color:var(--text-primary);margin-left:6px;" onclick="hideQRCode()">隐藏</button>
+    </div>
+    <div id="qrSection" style="display:none;">
+      <div class="qr-container">
+        <div id="qrcode"></div>
+      </div>
+      <p style="text-align:center;color:var(--text-secondary);font-size:0.85em;margin-top:8px;">使用 Clash / V2RayN / Shadowrocket 等客户端扫码导入</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="section">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('nodes')">📡 节点列表</button>
+      <button class="tab" onclick="switchTab('cfip')">🌐 优选 IP</button>
+      <button class="tab" onclick="switchTab('latency')">⚡ 延迟测试</button>
+      <button class="tab" onclick="switchTab('config')">⚙️ 配置信息</button>
+    </div>
+
+    <!-- Node List Tab -->
+    <div class="tab-content active" id="tab-nodes">
+      <div class="loading" id="nodesLoading">
+        <div class="spinner"></div>
+        加载节点信息...
+      </div>
+      <ul class="node-list" id="nodeList"></ul>
+    </div>
+
+    <!-- CFIP Tab -->
+    <div class="tab-content" id="tab-cfip">
+      <table class="ip-table" id="cfipTable">
+        <thead>
+          <tr><th>#</th><th>IP / 域名</th><th>端口</th><th>状态</th></tr>
+        </thead>
+        <tbody id="cfipBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Latency Test Tab -->
+    <div class="tab-content" id="tab-latency">
+      <div class="check-header">
+        <button class="check-btn" id="checkBtn" onclick="startLatencyCheck()">⚡ 开始测试</button>
+        <span class="check-time" id="checkTime"></span>
+      </div>
+      <table class="ip-table" id="latencyTable">
+        <thead>
+          <tr><th>#</th><th>IP / 域名</th><th>端口</th><th>延迟</th><th>状态</th></tr>
+        </thead>
+        <tbody id="latencyBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Config Tab -->
+    <div class="tab-content" id="tab-config">
+      <table class="config-table" id="configTable"></table>
+    </div>
+  </div>
+
+  <div class="footer">
+    Node-Argo Control Panel · Powered by Express
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- QR Code Library (lightweight inline) -->
+<script>
+// Minimal QR code generator
+function generateQR(text, size) {
+  // Use a simple QR code API for rendering
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  return { canvas, data: text };
+}
+
+// Tab switching
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// Toast notification
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Copy to clipboard
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✅ 已复制到剪贴板');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ 已复制到剪贴板');
+  });
+}
+
+// Copy single node
+function copyNode(text) {
+  copyText(text);
+}
+
+// Show QR code
+function showQRCode() {
+  const section = document.getElementById('qrSection');
+  const subUrl = document.getElementById('subUrl').textContent;
+  if (subUrl === '加载中...' || subUrl === '未配置') return;
+  section.style.display = 'block';
+  
+  const qrDiv = document.getElementById('qrcode');
+  qrDiv.innerHTML = '';
+  
+  // Use QR code API
+  const size = Math.min(256, window.innerWidth - 80);
+  const img = document.createElement('img');
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(subUrl) + '&bgcolor=ffffff&color=000000';
+  img.width = size;
+  img.height = size;
+  img.alt = 'QR Code';
+  img.style.display = 'block';
+  qrDiv.appendChild(img);
+}
+
+// Hide QR code
+function hideQRCode() {
+  document.getElementById('qrSection').style.display = 'none';
+}
+
+// Mask sensitive values
+function maskValue(val, show) {
+  if (!val || val === '' || val === '-' || val === '未配置') return '未配置';
+  if (!show) {
+    if (val.length > 20) return val.substring(0, 8) + '••••••••' + val.substring(val.length - 6);
+    if (val.length > 10) return val.substring(0, 4) + '••••' + val.substring(val.length - 4);
+    return '••••••••';
+  }
+  return val;
+}
+
+// Node type colors
+function nodeTypeColor(type) {
+  const colors = { 'vless': '#6c5ce7', 'vmess': '#00b894', 'trojan': '#e17055', 'hysteria2': '#fdcb6e', 'tuic': '#74b9ff' };
+  return colors[type] || '#8b8fa3';
+}
+
+// Load server IP from backend
+async function loadServerIP() {
+  try {
+    const resp = await fetch('/api/server-ip');
+    const data = await resp.json();
+    if (data.ip) {
+      const loc = (data.country || '') + ' ' + (data.isp || '');
+      document.getElementById('statIP').textContent = data.ip;
+      if (loc.trim()) document.getElementById('statIP').title = loc.trim();
+    } else {
+      document.getElementById('statIP').textContent = '获取失败';
+    }
+  } catch (e) {
+    document.getElementById('statIP').textContent = '获取失败';
+  }
+}
+
+// Load config
+async function loadConfig() {
+  try {
+    const resp = await fetch('/api/config');
+    const data = await resp.json();
+    
+    // Stats
+    document.getElementById('statPort').textContent = data.port || '-';
+    document.getElementById('statCFIP').textContent = (data.cfip || []).length;
+    document.getElementById('statNodes').textContent = ((data.cfip || []).length * 3);
+    document.getElementById('statTunnel').textContent = data.argoDomain ? '固定隧道' : '临时隧道';
+    
+    // Subscription URL
+    const host = window.location.origin;
+    const subUrl = host + '/' + (data.subPath || 'sub');
+    document.getElementById('subUrl').textContent = subUrl;
+    
+    // CFIP Table
+    const cfipBody = document.getElementById('cfipBody');
+    cfipBody.innerHTML = '';
+    (data.cfip || []).forEach((item, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (i + 1) + '</td><td>' + item[0] + '</td><td>' + item[1] + '</td><td><span class="badge badge-success">活跃</span></td>';
+      cfipBody.appendChild(tr);
+    });
+    
+    // Config Table
+    const configItems = [
+      ['UUID', maskValue(data.uuid, false), data.uuid],
+      ['订阅路径', '/' + data.subPath, null],
+      ['服务端口', data.port, null],
+      ['Argo 域名', data.argoDomain || '临时隧道', null],
+      ['Argo 端口', data.argoPort, null],
+      ['Nezha 监控', data.nezhaServer ? data.nezhaServer : '未配置', null],
+      ['Auto Access', data.autoAccess ? '开启' : '关闭', null],
+    ];
+    const configTable = document.getElementById('configTable');
+    configTable.innerHTML = '';
+    configItems.forEach(item => {
+      const tr = document.createElement('tr');
+      const fullVal = item[2] || item[1];
+      tr.innerHTML = '<td>' + item[0] + '</td><td>' + item[1] + (item[2] ? ' <button class="btn btn-sm" style="background:var(--bg-hover);color:var(--text-primary);margin-left:8px;" onclick="copyText(\'' + item[2].replace(/'/g, "\\'") + '\')">复制</button>' : '') + '</td>';
+      configTable.appendChild(tr);
+    });
+    
+  } catch (err) {
+    console.error('Failed to load config:', err);
+  }
+}
+
+// Load nodes
+async function loadNodes() {
+  try {
+    const resp = await fetch('/api/nodes');
+    const data = await resp.json();
+    
+    document.getElementById('nodesLoading').style.display = 'none';
+    const nodeList = document.getElementById('nodeList');
+    nodeList.innerHTML = '';
+    
+    (data.nodes || []).forEach(node => {
+      const li = document.createElement('li');
+      li.className = 'node-item';
+      
+      // Parse protocol
+      let protocol = 'unknown';
+      let detail = node;
+      const match = node.match(/^(vless|vmess|trojan|hysteria2|tuic):\/\//i);
+      if (match) {
+        protocol = match[1].toLowerCase();
+        // Extract readable parts
+        try {
+          if (protocol === 'vmess') {
+            const decoded = atob(node.replace('vmess://', ''));
+            const obj = JSON.parse(decoded);
+            detail = obj.ps + ' → ' + obj.add + ':' + obj.port;
+          } else {
+            const url = new URL(node);
+            detail = url.hostname + ':' + url.port + ' → ' + (url.hash ? url.hash.substring(1) : '');
+          }
+        } catch(e) {}
+      }
+      
+      li.innerHTML = 
+        '<div class="node-info">' +
+          '<div class="node-type" style="color:' + nodeTypeColor(protocol) + '">' + protocol.toUpperCase() + '</div>' +
+          '<div class="node-detail" title="' + node.replace(/"/g, '"') + '">' + detail + '</div>' +
+        '</div>' +
+        '<div class="node-actions">' +
+          '<button class="btn btn-sm btn-primary" onclick="copyNode(\'' + node.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '"') + '\')">📋 复制</button>' +
+        '</div>';
+      nodeList.appendChild(li);
+    });
+    
+    if ((data.nodes || []).length === 0) {
+      nodeList.innerHTML = '<div class="loading" style="padding:20px;">暂无节点数据，请等待服务启动完成</div>';
+    }
+    
+  } catch (err) {
+    document.getElementById('nodesLoading').innerHTML = '<div style="padding:20px;color:var(--danger);">加载失败: ' + err.message + '</div>';
+    console.error('Failed to load nodes:', err);
+  }
+}
+
+// Latency check
+let latencyChecking = false;
+
+async function startLatencyCheck() {
+  if (latencyChecking) return;
+  
+  // Get CFIP list from config API
+  let cfipList = [];
+  try {
+    const resp = await fetch('/api/config');
+    const data = await resp.json();
+    cfipList = data.cfip || [];
+  } catch (e) {
+    showToast('❌ 无法获取配置信息');
+    return;
+  }
+  
+  if (cfipList.length === 0) {
+    showToast('❌ 没有配置优选 IP');
+    return;
+  }
+  
+  latencyChecking = true;
+  const btn = document.getElementById('checkBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 测试中...';
+  document.getElementById('checkTime').textContent = '';
+  
+  const tbody = document.getElementById('latencyBody');
+  tbody.innerHTML = '';
+  
+  // Create rows first with "测试中" status
+  cfipList.forEach((item, i) => {
+    const tr = document.createElement('tr');
+    tr.id = 'latency-row-' + i;
+    tr.innerHTML = '<td>' + (i + 1) + '</td><td>' + item[0] + '</td><td>' + item[1] + '</td><td id="latency-val-' + i + '"><span class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></span></td><td id="latency-status-' + i + '"><span class="badge badge-accent">测试中</span></td>';
+    tbody.appendChild(tr);
+  });
+  
+  const startTime = performance.now();
+  
+  // Test each CFIP sequentially
+  for (let i = 0; i < cfipList.length; i++) {
+    const ip = cfipList[i][0];
+    const port = cfipList[i][1];
+    const valEl = document.getElementById('latency-val-' + i);
+    const statusEl = document.getElementById('latency-status-' + i);
+    
+    const result = await testLatency(ip, port);
+    
+    if (result.latency >= 0) {
+      valEl.textContent = result.latency + ' ms';
+      let colorClass = 'latency-good';
+      let badgeClass = 'badge-success';
+      let statusText = '正常';
+      if (result.latency > 500) {
+        colorClass = 'latency-bad';
+        badgeClass = 'badge-accent';
+        statusText = '较慢';
+      } else if (result.latency > 200) {
+        colorClass = 'latency-medium';
+        badgeClass = 'badge-accent';
+        statusText = '一般';
+      }
+      valEl.className = colorClass;
+      statusEl.innerHTML = '<span class="badge ' + badgeClass + '">' + statusText + '</span>';
+    } else {
+      valEl.textContent = '超时';
+      valEl.className = 'latency-timeout';
+      statusEl.innerHTML = '<span class="badge" style="background:rgba(225,112,85,0.2);color:var(--danger);">失败</span>';
+    }
+  }
+  
+  const totalMs = Math.round(performance.now() - startTime);
+  document.getElementById('checkTime').textContent = '测试完成 · 总耗时 ' + totalMs + 'ms · ' + new Date().toLocaleTimeString();
+  
+  btn.disabled = false;
+  btn.textContent = '⚡ 开始测试';
+  latencyChecking = false;
+}
+
+function testLatency(ip, port) {
+  // Try HTTP first (avoids SSL certificate issues with raw IPs), then HTTPS as fallback
+  return new Promise((resolve) => {
+    tryHttpLatency(ip, port, 5000).then((result) => {
+      if (result.latency >= 0) {
+        resolve(result);
+      } else {
+        // HTTP failed, try HTTPS
+        tryHttpsLatency(ip, port, 5000).then(resolve);
+      }
+    });
+  });
+}
+
+function tryHttpLatency(ip, port, timeoutMs) {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      resolve({ latency: -1 });
+    }, timeoutMs);
+    
+    const start = performance.now();
+    fetch('http://' + ip + ':' + port + '/', {
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal
+    }).then(() => {
+      clearTimeout(timeout);
+      const latency = Math.round(performance.now() - start);
+      resolve({ latency });
+    }).catch(() => {
+      clearTimeout(timeout);
+      resolve({ latency: -1 });
+    });
+  });
+}
+
+function tryHttpsLatency(ip, port, timeoutMs) {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      resolve({ latency: -1 });
+    }, timeoutMs);
+    
+    const start = performance.now();
+    fetch('https://' + ip + ':' + port + '/', {
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal
+    }).then(() => {
+      clearTimeout(timeout);
+      const latency = Math.round(performance.now() - start);
+      resolve({ latency });
+    }).catch(() => {
+      clearTimeout(timeout);
+      resolve({ latency: -1 });
+    });
+  });
+}
+
+// Auto refresh
+function init() {
+  loadServerIP();
+  loadConfig();
+  loadNodes();
+  // Auto refresh every 30s
+  setInterval(() => {
+    loadConfig();
+    loadNodes();
+  }, 30000);
+}
+
+init();
+</script>
+</body>
+</html>

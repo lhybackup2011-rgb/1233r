@@ -213,6 +213,10 @@
           <button class="btn btn-sm btn-ghost" onclick="refreshSubscription()">⟳ 刷新</button>
           <span class="text-xs text-[var(--text-muted)] self-center ml-auto">每秒随机采样 20 CF IP → TCP 测速 → Top 3 最优</span>
         </div>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="inline-block w-2 h-2 rounded-full bg-[var(--warning)]" id="speedTestDot"></span>
+          <span id="speedTestStatus" class="text-xs text-[var(--text-secondary)]">正在瀏覽器本地真·優選 IP 探測...</span>
+        </div>
         <div id="qrSection" class="hidden mt-4">
           <div class="flex justify-center p-4 bg-white rounded-lg">
             <div id="qrcode"></div>
@@ -488,6 +492,9 @@
 </div>
 
 <script>
+// ================================================================
+// UTILITIES
+// ================================================================
 function showToast(msg, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
@@ -671,7 +678,7 @@ async function refreshConfig() {
   } catch (err) { console.error('refreshConfig error:', err); }
 }
 
-// ---- Load server IP (previously not connected) ----
+// ---- Load server IP ----
 async function loadServerIP() {
   try {
     var resp = await fetch('/api/server-ip');
@@ -684,7 +691,7 @@ async function loadServerIP() {
   } catch (e) { document.getElementById('sysServerIP').textContent = '获取失败'; }
 }
 
-// ---- Load CFIP list (previously not connected) ----
+// ---- Load CFIP list ----
 function loadCFIP() {
   fetch('/api/config')
     .then(function(r) { return r.json(); })
@@ -707,7 +714,7 @@ function loadCFIP() {
 
 function refreshCFIP() { loadCFIP(); showToast('✅ CFIP 列表已刷新', 'success'); }
 
-// ---- Load full config table (previously not connected) ----
+// ---- Load full config table ----
 function loadFullConfig() {
   fetch('/api/config')
     .then(function(r) { return r.json(); })
@@ -832,6 +839,61 @@ async function loadNodes() {
   } catch (err) { document.getElementById('nodesLoading').innerHTML = '<div class="text-center py-8 text-[var(--danger)]">加载失败: ' + escapeHtml(err.message) + '</div>'; }
 }
 
+// ================================================================
+// [NEW CODE] FRONTEND BROWSER HIGH-CONCURRENCY SPEED TEST
+// ================================================================
+async function runFrontendSpeedTest() {
+  const pool = ["172.64.145.13", "104.20.17.244", "104.16.0.1", "104.17.0.1", "172.64.146.12", "172.64.147.13", "104.22.7.10", "104.25.10.12", "104.27.144.5", "108.162.192.1", "162.158.0.1", "198.41.128.1"];
+  const statusEl = document.getElementById('speedTestStatus');
+  const dotEl = document.getElementById('speedTestDot');
+  const results = [];
+
+  if (!statusEl) return;
+
+  async function testIp(ip) {
+    const start = Date.now();
+    try {
+      // 透過 no-cors 規避跨網域限制，利用 HTTP 握手時間差計算物理延遲
+      await Promise.race([
+        fetch('https://' + ip, { mode: 'no-cors' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1200))
+      ]);
+      const latency = Date.now() - start;
+      results.push({ ip: ip, latency: latency });
+    } catch (e) {
+      // 測速失敗或超時則不計入
+    }
+  }
+
+  // 併發探測所有 IP 段
+  await Promise.all(pool.map(ip => testIp(ip)));
+
+  // 排序選出最快的 Top 5
+  results.sort((a, b) => a.latency - b.latency);
+  const top5 = results.slice(0, 5).map(r => r.ip);
+
+  if (top5.length > 0) {
+    try {
+      const resp = await fetch('/api/save-client-ips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ips: top5 })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        statusEl.textContent = "✅ 已成功為您優選 " + top5.length + " 個本地最快節點並鎖定訂閱！";
+        dotEl.className = "inline-block w-2 h-2 rounded-full bg-[var(--success)]";
+      }
+    } catch (err) {
+      statusEl.textContent = "❌ 上傳真·優選 IP 失敗";
+      dotEl.className = "inline-block w-2 h-2 rounded-full bg-[var(--danger)]";
+    }
+  } else {
+    statusEl.textContent = "❌ 本地測速全部超時，正在使用伺服器預設池";
+    dotEl.className = "inline-block w-2 h-2 rounded-full bg-[var(--danger)]";
+  }
+}
+
 // ---- Initial load ----
 async function initialLoad() {
   await refreshConfig();
@@ -842,9 +904,12 @@ async function initialLoad() {
   } catch(e) {}
   await loadNodes();
   await loadSystemStatus();
-  loadServerIP();      // [NEW] connected to /api/server-ip
-  loadCFIP();          // [NEW] connected to /api/config → cfip
-  loadFullConfig();    // [NEW] connected to /api/config → full table
+  loadServerIP();      
+  loadCFIP();          
+  loadFullConfig();    
+  
+  // [NEW] 網頁加載完畢後，背景執行本地真·測速，自動回寫後端大腦
+  runFrontendSpeedTest();
 }
 
 initialLoad();

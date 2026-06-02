@@ -37,6 +37,10 @@ app.set('trust proxy', true); // For correct req.ip behind proxies
 // [BUG FIX 3]: In-memory GeoIP cache to prevent subscription 500 errors on API timeout.
 const geoCache = {};
 
+// [CLIENT-PROBED]: Stores the Top 5 IPs probed by the user's browser.
+// Initialized with sensible fallback defaults. Updated via POST /api/save-client-ips.
+let clientProbedIPs = [["172.64.145.13", 443], ["104.20.17.244", 443], ["104.16.0.1", 443], ["104.17.0.1", 443], ["172.64.146.12", 443]];
+
 // ============================================================
 // 2. DYNAMIC CIDR CLOUDFLARE IP GENERATOR & TCP CONCURRENT LATENCY TESTER
 // ============================================================
@@ -1410,6 +1414,31 @@ app.post("/api/restart-argo", async (req, res) => {
   }
 });
 
+// ---- POST: Save client-browser-probed Top 5 IPs ----
+app.post("/api/save-client-ips", (req, res) => {
+  try {
+    const { ips } = req.body;
+    if (!ips || !Array.isArray(ips) || ips.length === 0) {
+      return res.status(400).json({ error: 'Invalid or empty IP list' });
+    }
+    const normalized = ips.map(entry => {
+      if (typeof entry === 'string') return [entry, 443];
+      if (Array.isArray(entry) && entry.length >= 1) return [entry[0], entry[1] || 443];
+      return null;
+    }).filter(Boolean);
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: 'No valid IP entries' });
+    }
+    clientProbedIPs = normalized.slice(0, 5);
+    lastConfigLog = `【系统通知】浏览器本地测速 Top ${clientProbedIPs.length} 黄金 IP 已锁定订阅！`;
+    console.log(`Client-probed IPs updated: ${clientProbedIPs.map(e => e[0] + ':' + e[1]).join(', ')}`);
+    res.json({ success: true, count: clientProbedIPs.length, ips: clientProbedIPs });
+  } catch (err) {
+    console.error('Error in /api/save-client-ips:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- Generate subscription with a specific IP list (dynamic TCP-probed or fallback) ----
 async function generateSubscriptionWithIPs(ipList) {
   const domain = currentArgoDomain || ARGO_DOMAIN || '';
@@ -1451,54 +1480,46 @@ async function generateSubscriptionWithIPs(ipList) {
   return subTxt;
 }
 
-// ---- Dynamic TCP-Probed Optimal IP Subscription (Module 4 upgraded) ----
+// ---- Client-Probed Optimal IP Subscription (replaces server-side TCP probe) ----
+// Uses the Top 5 IPs tested by the user's browser via runFrontendSpeedTest().
+// Falls back to clientProbedIPs default pool if no client data received yet.
 app.get(`/${SUB_PATH}`, async (req, res) => {
   try {
     // Get user's real IP
     const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection.remoteAddress || '';
     
-    // [BUG FIX 3]: In-memory geoCache lookup — avoids repeated API calls and prevents 500 on timeout.
+    // [BUG FIX 3]: In-memory geoCache lookup.
     let countryCode = geoCache[userIp] || '';
     
     if (!countryCode) {
-      // Check Cloudflare cf-ipcountry header first (highest priority, zero latency).
       const cfCountry = (req.headers['cf-ipcountry'] || '').toUpperCase();
       if (cfCountry && cfCountry.length === 2 && CF_OPTIMAL_IPS[cfCountry]) {
         countryCode = cfCountry;
       } else {
-        // Fallback: external geo API lookup
         const geoInfo = await getUserGeoInfo(userIp);
         countryCode = geoInfo.country || '';
       }
-      // Write to cache for next time
       geoCache[userIp] = countryCode;
     }
     
-    // Ultimate fallback: if countryCode is still empty or unrecognized, use 'default'
     countryCode = countryCode || 'default';
     
-    // [DYNAMIC PROBE]: Generate 20 random Cloudflare IPs from official CIDR ranges
-    const randomIPs = generateRandomCloudflareIPs(20);
-    console.log(`Subscription request from ${userIp} (${countryCode}): probing ${randomIPs.length} random CF IPs...`);
+    // Use clientProbedIPs (browser-tested Top 5) directly — no server-side TCP probing.
+    const usedIPs = clientProbedIPs.length > 0 ? clientProbedIPs : CFIP;
+    console.log(`Subscription for ${userIp} (${countryCode}): using ${usedIPs.length} client-probed IPs: ${usedIPs.map(e => e[0] + ':' + e[1]).join(', ')}`);
 
-    // [DYNAMIC PROBE]: Concurrent TCP latency test on port 443, pick top 3 fastest
-    const optimalIPs = await testOptimalIPs(randomIPs);
-    console.log(`Optimal CF IPs for ${userIp}: ${optimalIPs.map(e => e[0] + ':' + e[1]).join(', ')}`);
-
-    // Generate subscription with the dynamically probed optimal IPs
-    const subTxt = await generateSubscriptionWithIPs(optimalIPs);
+    const subTxt = await generateSubscriptionWithIPs(usedIPs);
     
     const encodedContent = Buffer.from(subTxt).toString('base64');
     res.set('Content-Type', 'text/plain; charset=utf-8');
     res.set('X-Geo-Country', countryCode || 'unknown');
     res.set('X-Node-Protocol', currentInboundConfig.protocol);
-    res.set('X-Probed-IPs', optimalIPs.length.toString());
+    res.set('X-Probed-IPs', usedIPs.length.toString());
     res.send(encodedContent);
   } catch (err) {
     console.error('Subscription generation error:', err);
-    // Fallback to original subscription with CFIP env list
     try {
-      const sub = await generateSubscriptionWithIPs(CFIP);
+      const sub = await generateSubscriptionWithIPs(clientProbedIPs.length > 0 ? clientProbedIPs : CFIP);
       const encodedContent = Buffer.from(sub).toString('base64');
       res.set('Content-Type', 'text/plain; charset=utf-8');
       res.send(encodedContent);

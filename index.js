@@ -238,7 +238,7 @@ const currentInboundConfig = {
   },
   streamSettings: {
     network: 'ws',
-    security: 'none',
+    security: 'tls',
     wsSettings: {
       path: '/vless-argo',
       headers: { Host: '' }
@@ -247,7 +247,7 @@ const currentInboundConfig = {
       serviceName: ''
     },
     tlsSettings: {
-      serverName: '',
+      serverName: 'laoda.kobe824.icu',
       alpn: ['h2', 'http/1.1'],
       minVersion: '1.2'
     }

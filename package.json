@@ -1,9 +1,9 @@
 {
-  "name": "nodejs-argo",
+  "name": "fgui5",
   "version": "1,0,0",
   "description": "Thsi is a node project",
   "main": "index.js",
-  "author": "eooce",
+  "author": "lhyds",
   "repository": "",
   "license": "MIT",
   "private": false,

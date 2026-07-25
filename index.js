@@ -22,8 +22,8 @@ const UUID = process.env.UUID || 'fd6f5009-39d7-4d93-9176-3cbb69870987';
 const NEZHA_SERVER = process.env.NEZHA_SERVER || '';
 const NEZHA_PORT = process.env.NEZHA_PORT || '';
 const NEZHA_KEY = process.env.NEZHA_KEY || '';
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'laoda.kobe824.icu';
-const ARGO_AUTH = process.env.ARGO_AUTH || 'eyJhIjoiOTEzMWQxMTMwZjQ2NzFjNzdjNDA1MTM4NTNhMTEzMTYiLCJ0IjoiNjBiZWUyYjMtNjljOC00ZDA1LWI1MjctYWMyMjQ2ZGU2NDQ4IiwicyI6IlpEZGpZelZoTnpRdFpqazVNQzAwTm1Wa0xXRm1OVEl0TUdFMU5UTTJaall3TkRFMiJ9';
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
+const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_PORT = process.env.ARGO_PORT || 8510;
 const CFIP = process.env.CFIP ? process.env.CFIP.split(',').map(e => {
   const parts = e.trim().split(':');
